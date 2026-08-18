@@ -1,44 +1,57 @@
 using UnityEngine;
-// Importante para el nuevo Input System en Unity 6 si usas la clase Mouse / Pointer
-using UnityEngine.InputSystem; 
+using UnityEngine.InputSystem;
 
 public class JengaPlayerController : MonoBehaviour
 {
     public Camera mainCamera;
-    public float pushForce = 3.5f;
+    public float pushForce = 2.5f;
 
     void Start()
     {
-        if (mainCamera == null)
-            mainCamera = Camera.main;
+        if (mainCamera == null) mainCamera = Camera.main;
     }
 
     void Update()
     {
-        // Verificación compatible con el nuevo Input System para el clic izquierdo
-        bool leftMouseClicked = false;
-        
+        // Clic Izquierdo para golpear/retirar bloque
         if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
-            leftMouseClicked = true;
-        }
-
-        if (leftMouseClicked)
-        {
-            // Usamos Mouse.current.position en lugar de Input.mousePosition
-            Vector2 mousePos = Mouse.current != null ? Mouse.current.position.ReadValue() : (Vector2)Input.mousePosition;
-            Ray ray = mainCamera.ScreenPointToRay(mousePos);
-            RaycastHit hit;
-
-            if (Physics.Raycast(ray, out hit))
+            Ray ray = mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            if (Physics.Raycast(ray, out RaycastHit hit))
             {
                 JengaBlock block = hit.collider.GetComponent<JengaBlock>();
                 if (block != null)
                 {
-                    Vector3 pushDirection = (hit.point - mainCamera.transform.position).normalized;
-                    block.PushBlock(pushDirection, pushForce);
+                    // Validación de Regla: No se pueden retirar bloques del nivel superior
+                    if (!JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
+                    {
+                        Debug.LogWarning("¡No se pueden retirar bloques del nivel superior!");
+                        return;
+                    }
+
+                    ApplyFaceSpecificForce(block, hit);
                 }
             }
         }
+    }
+    
+   private void ApplyFaceSpecificForce(JengaBlock block, RaycastHit hit)
+    {
+        // Transformar la normal del impacto al espacio local del bloque
+        Vector3 localNormal = block.transform.InverseTransformDirection(hit.normal);
+        Vector3 pushDirection;
+
+        // Determinar si es cara frontal/trasera o lateral
+        if (Mathf.Abs(localNormal.z) > 0.5f || Mathf.Abs(localNormal.x) > 0.5f)
+        {
+            pushDirection = -hit.normal; // Hacia adentro/contrario
+        }
+        else
+        {
+            pushDirection = hit.normal;  // Hacia afuera
+        }
+
+        // Usamos TU método PushBlock pasándole dirección, fuerza y punto de contacto
+        block.PushBlock(pushDirection, pushForce, hit.point);
     }
 }
