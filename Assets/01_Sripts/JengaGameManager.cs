@@ -48,11 +48,19 @@ public class JengaGameManager : MonoBehaviour
 
     private IEnumerator PlaceOnTopRoutine(JengaBlock block)
     {
-        // Desactivar físicas mientras se reubica
         Rigidbody rb = block.GetComponent<Rigidbody>();
-        rb.isKinematic = true;
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
+        
+        if (rb != null)
+        {
+            // CORRECCIÓN UNITY 6: Primero se resetean las velocidades MIENTRAS es dinámico...
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+            // ... Y LUEGO se activa el modo cinemático.
+            rb.isKinematic = true;
+        }
 
         // Si el piso superior ya tiene 3 bloques, creamos un nuevo nivel arriba
         if (blocksOnTopFloor >= 3)
@@ -91,7 +99,10 @@ public class JengaGameManager : MonoBehaviour
         yield return new WaitForSeconds(0.1f);
 
         // Reactivar físicas de forma estable
-        rb.isKinematic = false;
-        rb.WakeUp();
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.WakeUp();
+        }
     }
 }

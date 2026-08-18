@@ -1,12 +1,15 @@
 using UnityEngine;
+using System.Collections;
 
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(BoxCollider))]
 public class JengaBlock : MonoBehaviour
 {
     [Header("Datos de Reglas")]
-    public int floorLevel;       // Nivel del piso al que pertenece actualmente
-    public bool hasFallen = false; // Evita que el evento de caída se dispare varias veces
+    public int floorLevel;                 // Nivel del piso
+    public bool hasFallen = false;           // Evita ejecuciones duplicadas
+    public bool wasTouchedByPlayer = false;  // Marca si fue interactuado por el usuario
+    public bool isExtracting = false;        // Estado de extracción en proceso
 
     private Rigidbody rb;
     private Vector3 initialPosition;
@@ -15,53 +18,69 @@ public class JengaBlock : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        
-        // Guardamos posición y rotación por si quieres reiniciar la escena
         initialPosition = transform.position;
         initialRotation = transform.rotation;
-
-        // Centro de masa centrado para estabilidad física
         rb.centerOfMass = Vector3.zero;
     }
 
     /// <summary>
-    /// Aplica la fuerza física concentrada en el punto exacto de impacto.
+    /// Desliza el bloque suavemente fuera de la torre como una animación.
     /// </summary>
-    public Vector3 PushBlock(Vector3 direction, float force, Vector3 hitPoint)
+    /// <param name="direction">Dirección del movimiento</param>
+    /// <param name="distance">Distancia a recorrer para salir de la estructura</param>
+    /// <param name="duration">Tiempo en segundos que dura el deslizamiento</param>
+    public void ExtractBlockSmoothly(Vector3 direction, float distance = 0.75f, float duration = 0.3f)
     {
-        if (rb == null) rb = GetComponent<Rigidbody>();
-
-        // Si estaba en kinematic por estar en la cima, lo liberamos
-        if (rb.isKinematic)
-        {
-            rb.isKinematic = false;
-        }
-
-        if (rb.IsSleeping())
-        {
-            rb.WakeUp();
-        }
-
-        // Aplica el impulso en el punto donde se hizo clic (AddForceAtPosition)
-        rb.AddForceAtPosition(direction * force, hitPoint, ForceMode.Impulse);
-
-        // Torque leve y controlado para que gire de forma orgánica
-        Vector3 randomTorque = new Vector3(Random.Range(-0.1f, 0.1f), Random.Range(-0.1f, 0.1f), Random.Range(-0.1f, 0.1f)) * force;
-        rb.AddTorque(randomTorque, ForceMode.Impulse);
-
-        return direction * force;
+        if (isExtracting) return;
+        StartCoroutine(SmoothExtractionRoutine(direction, distance, duration));
     }
 
-    /// <summary>
-    /// Detecta cuando el bloque cae al suelo (Plane) para recolocarlo en la cima.
-    /// </summary>
+    private IEnumerator SmoothExtractionRoutine(Vector3 direction, float distance, float duration)
+    {
+        isExtracting = true;
+        wasTouchedByPlayer = true;
+
+        if (rb == null) rb = GetComponent<Rigidbody>();
+
+        // Desactivamos la física momentáneamente para que se deslice de forma limpia sin explotar
+        rb.isKinematic = true;
+
+        Vector3 startPos = transform.position;
+        Vector3 targetPos = startPos + (direction.normalized * distance);
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            
+            // Curva de suavizado (SmoothStep) para efecto de movimiento manual
+            t = t * t * (3f - 2f * t); 
+            
+            transform.position = Vector3.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+
+        // Una vez fuera de su nicho, devolvemos las físicas para que caiga por gravedad
+        rb.isKinematic = false;
+        rb.WakeUp();
+        rb.linearVelocity = direction.normalized * 0.8f; // Ligera inercia de salida
+
+        isExtracting = false;
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
-        if (!hasFallen && (collision.gameObject.CompareTag("Ground") || collision.gameObject.name.Contains("Plane")))
+        bool isGround = collision.gameObject.CompareTag("Ground") || collision.gameObject.name.Contains("Plane");
+
+        if (isGround)
         {
-            hasFallen = true;
-            // Damos 0.5s para que la caída se sienta fluida antes de reposicionarlo arriba
-            Invoke(nameof(TriggerRelocation), 0.5f);
+            // Solo si el jugador extrajo este bloque se reubica arriba
+            if (wasTouchedByPlayer && !hasFallen)
+            {
+                hasFallen = true;
+                Invoke(nameof(TriggerRelocation), 0.4f);
+            }
         }
     }
 
@@ -71,27 +90,20 @@ public class JengaBlock : MonoBehaviour
         {
             JengaGameManager.Instance.RelocateBlockToTop(this);
         }
+
+        wasTouchedByPlayer = false;
+        hasFallen = false;
     }
 
-    /// <summary>
-    /// Reinicia las velocidades físicas (compatible con Unity 6).
-    /// </summary>
-    public void StopPhysics()
-    {
-        if (rb == null) rb = GetComponent<Rigidbody>();
-
-        rb.linearVelocity = Vector3.zero;  // Sintaxis oficial Unity 6
-        rb.angularVelocity = Vector3.zero;
-    }
-
-    /// <summary>
-    /// Método para reiniciar el bloque a su posición original en el tablero.
-    /// </summary>
     public void ResetBlock()
     {
-        StopPhysics();
+        if (rb == null) rb = GetComponent<Rigidbody>();
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
         rb.Sleep();
         transform.SetPositionAndRotation(initialPosition, initialRotation);
         hasFallen = false;
+        wasTouchedByPlayer = false;
+        isExtracting = false;
     }
 }
