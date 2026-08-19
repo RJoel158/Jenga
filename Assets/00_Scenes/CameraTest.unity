@@ -124,6 +124,74 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 5988931695675893699, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
   m_PrefabInstance: {fileID: 1254402943}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &706988641
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 706988644}
+  - component: {fileID: 706988643}
+  - component: {fileID: 706988642}
+  m_Layer: 0
+  m_Name: EventSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &706988642
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 706988641}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.StandaloneInputModule
+  m_SendPointerHoverToParent: 1
+  m_HorizontalAxis: Horizontal
+  m_VerticalAxis: Vertical
+  m_SubmitButton: Submit
+  m_CancelButton: Cancel
+  m_InputActionsPerSecond: 10
+  m_RepeatDelay: 0.5
+  m_ForceModuleActive: 0
+--- !u!114 &706988643
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 706988641}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76c392e42b5098c458856cdf6ecaaaa1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.EventSystems.EventSystem
+  m_FirstSelected: {fileID: 0}
+  m_sendNavigationEvents: 1
+  m_DragThreshold: 10
+--- !u!4 &706988644
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 706988641}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &768179323
 GameObject:
   m_ObjectHideFlags: 0
@@ -135,7 +203,7 @@ GameObject:
   - component: {fileID: 768179327}
   - component: {fileID: 768179326}
   - component: {fileID: 768179325}
-  - component: {fileID: 768179324}
+  - component: {fileID: 768179328}
   m_Layer: 0
   m_Name: BaseTarget
   m_TagString: Untagged
@@ -143,25 +211,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &768179324
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 768179323}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 1778676317, guid: 8a9a760f95896c34689febc965510927, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Vuforia.Unity.Engine.dll::Vuforia.ImageTargetPreview
-  mObserverBehaviour: {fileID: 768179326}
-  mHiddenRoot: {fileID: 0}
-  mTargetName: sonk_rom
-  mDatasetName: Vuforia/CameraImage.xml
-  mCastedBehaviour: {fileID: 768179326}
-  mMeshFilter: {fileID: 0}
-  mMeshRenderer: {fileID: 0}
 --- !u!114 &768179325
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -232,7 +281,7 @@ MonoBehaviour:
   mMotionHint: 1
   mTrackingOptimization: 0
   mTrackingOptimizationNeedsUpgrade: 0
-  mPreview: {fileID: 768179324}
+  mPreview: {fileID: 768179328}
 --- !u!4 &768179327
 Transform:
   m_ObjectHideFlags: 0
@@ -249,8 +298,77 @@ Transform:
   - {fileID: 1201365792}
   - {fileID: 1254402944}
   - {fileID: 1734967183}
+  - {fileID: 1106097316}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &768179328
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768179323}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1778676317, guid: 8a9a760f95896c34689febc965510927, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Vuforia.Unity.Engine.dll::Vuforia.ImageTargetPreview
+  mObserverBehaviour: {fileID: 768179326}
+  mHiddenRoot: {fileID: 0}
+  mTargetName: sonk_rom
+  mDatasetName: Vuforia/CameraImage.xml
+  mCastedBehaviour: {fileID: 768179326}
+  mMeshFilter: {fileID: 0}
+  mMeshRenderer: {fileID: 0}
+--- !u!1 &1106097315
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1106097316}
+  - component: {fileID: 1106097317}
+  m_Layer: 0
+  m_Name: JengaSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1106097316
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1106097315}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.44327, y: 0, z: 0.10563}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 768179327}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1106097317
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1106097315}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a43990af1b385ee4b82e92613059958c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JengaFloorTest
+  blockPrefab: {fileID: 7160432114029522204, guid: 666ed6f0ccf408148985b69b5324ba89, type: 3}
+  blockWidth: 0.025
+  blockHeight: 0.015
+  surfacePlane: {fileID: 1734967183}
+  microGap: 0.002
 --- !u!1 &1201365791
 GameObject:
   m_ObjectHideFlags: 0
@@ -545,10 +663,18 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: b1cfd1c89db2bdf4ca97da50a7bfb6db, type: 2}
+    - target: {fileID: 5719245596599109958, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5756170376412664413, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: b1cfd1c89db2bdf4ca97da50a7bfb6db, type: 2}
+    - target: {fileID: 5843177769119150764, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5843177769119150764, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: surfacePlane
       value: 
@@ -559,12 +685,20 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5988931695675893699, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6030420013514601436, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: b1cfd1c89db2bdf4ca97da50a7bfb6db, type: 2}
+    - target: {fileID: 6193319832607027318, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: m_Material
+      value: 
+      objectReference: {fileID: 13400000, guid: 8dee979cc6cadc54b8736935aead829c, type: 2}
+    - target: {fileID: 6226816206187328830, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: m_Material
+      value: 
+      objectReference: {fileID: 13400000, guid: 8dee979cc6cadc54b8736935aead829c, type: 2}
     - target: {fileID: 6243821981047745759, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -685,6 +819,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: b1cfd1c89db2bdf4ca97da50a7bfb6db, type: 2}
+    - target: {fileID: 8767764168084794647, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: m_Material
+      value: 
+      objectReference: {fileID: 13400000, guid: 8dee979cc6cadc54b8736935aead829c, type: 2}
     - target: {fileID: 8885973759266674699, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
@@ -763,7 +901,7 @@ MeshCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1734967182}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: 0d283595bb303e94593ad135803be107, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -785,7 +923,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1734967182}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -1134,3 +1272,4 @@ SceneRoots:
   - {fileID: 1761984062}
   - {fileID: 2131726989}
   - {fileID: 768179327}
+  - {fileID: 706988644}

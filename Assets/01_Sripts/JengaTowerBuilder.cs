@@ -101,7 +101,7 @@ public class JengaTowerBuilder : MonoBehaviour
 
         float centerX = transform.position.x;
         float centerZ = transform.position.z;
-
+        
         for (int floor = 0; floor < totalFloors; floor++)
         {
             bool isEvenFloor = (floor % 2 == 0);
