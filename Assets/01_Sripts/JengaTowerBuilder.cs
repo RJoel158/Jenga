@@ -71,6 +71,7 @@ public class JengaTowerBuilder : MonoBehaviour
                 if (rb != null)
                 {
                     rb.isKinematic = true; // Inicia inmóvil
+                   
                 }
 
                 Renderer rend = block.GetComponent<Renderer>();
