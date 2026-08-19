@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class JengaTowerBuilder : MonoBehaviour
 {
@@ -15,6 +16,70 @@ public class JengaTowerBuilder : MonoBehaviour
 
     [Header("Ajustes de Estabilidad Física")]
     public float microGap = 0.001f; // Holgura milimétrica para evitar presión entre capas
+
+    [Header("Ejecución en Runtime")]
+    public bool buildOnStart = true;
+    public float delayBeforePhysics = 0.5f; // segundos que la torre queda "congelada" antes de soltarse
+
+    [Header("AR/Móvil: Arranque Seguro")]
+    public bool preparePhysicsOnStart = true;
+    public bool autoEnablePhysicsAfterPrepare = true;
+    [Min(0f)] public float stabilizationDelay = 0.35f;
+    public bool detachTowerFromTracking = true;
+    public bool detachEachBlockFromTower = false;
+    [Min(0f)] public float physicsMassOverride = 0.08f;
+
+    private bool physicsEnabled;
+
+    void Start()
+    {
+        if (buildOnStart)
+        {
+            BuildTower();
+            Invoke(nameof(EnablePhysics), delayBeforePhysics);
+        }
+    }
+
+    private IEnumerator PreparePhysicsRoutine()
+    {
+        Rigidbody[] rbs = GetComponentsInChildren<Rigidbody>(true);
+
+        foreach (Rigidbody rb in rbs)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.useGravity = false;
+            rb.isKinematic = true;
+            rb.Sleep();
+        }
+
+        // Evita que la simulación dependa del jitter del seguimiento AR.
+        if (detachTowerFromTracking && transform.parent != null)
+        {
+            transform.SetParent(null, true);
+        }
+
+        if (detachEachBlockFromTower)
+        {
+            foreach (Rigidbody rb in rbs)
+            {
+                if (rb.transform.parent != null)
+                {
+                    rb.transform.SetParent(null, true);
+                }
+            }
+        }
+
+        if (stabilizationDelay > 0f)
+        {
+            yield return new WaitForSeconds(stabilizationDelay);
+        }
+
+        if (autoEnablePhysicsAfterPrepare)
+        {
+            EnablePhysics();
+        }
+    }
 
     [Header("Variación Visual")]
     [Range(0f, 0.2f)] public float colorVariation = 0.12f;
@@ -71,6 +136,7 @@ public class JengaTowerBuilder : MonoBehaviour
                 if (rb != null)
                 {
                     rb.isKinematic = true; // Inicia inmóvil
+                   
                 }
 
                 Renderer rend = block.GetComponent<Renderer>();
@@ -92,13 +158,43 @@ public class JengaTowerBuilder : MonoBehaviour
     }
 
     [ContextMenu("Activar Físicas")]
+    [ContextMenu("Activar Físicas")]
     public void EnablePhysics()
     {
-        Rigidbody[] rbs = GetComponentsInChildren<Rigidbody>();
-        foreach (Rigidbody rb in rbs)
+        if (physicsEnabled) return;
+        physicsEnabled = true; // lo marcamos ya para bloquear ejecuciones duplicadas durante la corrutina
+        StartCoroutine(EnablePhysicsGradually());
+    }
+
+    private IEnumerator EnablePhysicsGradually()
+    {
+        int totalRbs = 0;
+
+        // Recorremos cada "Floor_X" (child de este objeto) de abajo hacia arriba
+        for (int i = 0; i < transform.childCount; i++)
         {
-            rb.isKinematic = false;
-            rb.WakeUp();
+            Transform floorParent = transform.GetChild(i);
+            Rigidbody[] floorRbs = floorParent.GetComponentsInChildren<Rigidbody>(true);
+
+            foreach (Rigidbody rb in floorRbs)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                if (physicsMassOverride > 0f)
+                {
+                    rb.mass = physicsMassOverride;
+                }
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rb.useGravity = true;
+                rb.isKinematic = false;
+                rb.WakeUp();
+            }
+
+            totalRbs += floorRbs.Length;
+            yield return new WaitForFixedUpdate(); // deja que el solver "digiera" este piso antes del siguiente
         }
+
+        Debug.Log($"Físicas activadas de forma segura (gradual) en {totalRbs} bloques.");
     }
 }
