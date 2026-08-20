@@ -57,17 +57,13 @@ public class BlockLogic : MonoBehaviour
         if (!Physics.Raycast(ray, out RaycastHit hit))
             return;
 
-        // Buscamos el componente JengaBlock en el objeto tocado (o en sus padres,
-        // por si el collider está en un hijo del bloque).
         JengaBlock block = hit.collider.GetComponentInParent<JengaBlock>();
         if (block == null)
             return;
 
-        // Regla de Jenga: no se puede mover un bloque del piso superior activo.
         if (JengaGameManager.Instance != null &&
             !JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
         {
-            Debug.LogWarning("[BlockLogic] No se puede mover un bloque del nivel superior activo.");
             return;
         }
 
@@ -75,8 +71,6 @@ public class BlockLogic : MonoBehaviour
         draggedJengaBlock = block;
         draggedRb = block.GetComponent<Rigidbody>();
 
-        // Mientras se arrastra, lo pasamos a kinemático para moverlo a mano
-        // sin que la física interna pelee contra el movimiento manual.
         if (draggedRb != null)
         {
             draggedRb.linearVelocity = Vector3.zero;
@@ -113,7 +107,6 @@ public class BlockLogic : MonoBehaviour
             cameraForward * forwardMovement;
         movement.y = 0;
 
-        // Movemos el BLOQUE arrastrado, no la cámara.
         draggedBlock.position = initialBlockPosition + movement;
     }
 
@@ -121,7 +114,6 @@ public class BlockLogic : MonoBehaviour
     {
         if (draggedRb != null)
         {
-            // Devolvemos la física real al soltar, para que caiga/asiente naturalmente.
             draggedRb.isKinematic = false;
             draggedRb.useGravity = true;
             draggedRb.WakeUp();

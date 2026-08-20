@@ -380,12 +380,12 @@ MonoBehaviour:
   blockWidth: 0.025
   blockHeight: 0.015
   blockLength: 0.075
-  floors: 18
+  floors: 10
   surfacePlane: {fileID: 1734967183}
   microGap: 0.002
   delayAfterTracked: 3
-  extraSpawnHeight: 0.05
-  keepKinematicOnSpawn: 1
+  dropHeightOffset: 0.15
+  settleTimePerFloor: 0.35
 --- !u!1 &1201365791
 GameObject:
   m_ObjectHideFlags: 0
