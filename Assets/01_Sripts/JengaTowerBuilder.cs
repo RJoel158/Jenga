@@ -3,31 +3,33 @@ using System.Collections;
 
 public class JengaTowerBuilder : MonoBehaviour
 {
+    [Header("Prefab de Bloque")]
     public GameObject blockPrefab;
     
-    [Header("Dimensiones del Bloque")]
-    public float blockLength = 0.75f;
-    public float blockWidth = 0.25f;  
-    public float blockHeight = 0.15f;
+    [Header("Dimensiones del Bloque (NewJengaBlock)")]
+    public float blockWidth = 0.025f;  // X en NewJengaBlock
+    public float blockHeight = 0.015f; // Y en NewJengaBlock
+    public float blockLength = 0.075f; // Z en NewJengaBlock
 
     [Header("Configuración de la Torre")]
     public int totalFloors = 18; 
     public Transform surfacePlane;
-
-    [Header("Ajustes de Estabilidad Física")]
-    public float microGap = 0.001f; // Holgura milimétrica para evitar presión entre capas
+    public float microGap = 0.0004f; // Holgura milimétrica entre capas
+    public float extraSpawnHeight = 0.002f;
 
     [Header("Ejecución en Runtime")]
     public bool buildOnStart = true;
-    public float delayBeforePhysics = 0.5f; // segundos que la torre queda "congelada" antes de soltarse
+    public float delayBeforePhysics = 0.5f;
 
     [Header("AR/Móvil: Arranque Seguro")]
-    public bool preparePhysicsOnStart = true;
+    public bool keepKinematicOnSpawn = true;
     public bool autoEnablePhysicsAfterPrepare = true;
     [Min(0f)] public float stabilizationDelay = 0.35f;
     public bool detachTowerFromTracking = true;
-    public bool detachEachBlockFromTower = false;
     [Min(0f)] public float physicsMassOverride = 0.08f;
+
+    [Header("Variación Visual")]
+    [Range(0f, 0.2f)] public float colorVariation = 0.12f;
 
     private bool physicsEnabled;
 
@@ -36,142 +38,139 @@ public class JengaTowerBuilder : MonoBehaviour
         if (buildOnStart)
         {
             BuildTower();
-            Invoke(nameof(EnablePhysics), delayBeforePhysics);
-        }
-    }
-
-    private IEnumerator PreparePhysicsRoutine()
-    {
-        Rigidbody[] rbs = GetComponentsInChildren<Rigidbody>(true);
-
-        foreach (Rigidbody rb in rbs)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.useGravity = false;
-            rb.isKinematic = true;
-            rb.Sleep();
-        }
-
-        // Evita que la simulación dependa del jitter del seguimiento AR.
-        if (detachTowerFromTracking && transform.parent != null)
-        {
-            transform.SetParent(null, true);
-        }
-
-        if (detachEachBlockFromTower)
-        {
-            foreach (Rigidbody rb in rbs)
+            if (autoEnablePhysicsAfterPrepare)
             {
-                if (rb.transform.parent != null)
-                {
-                    rb.transform.SetParent(null, true);
-                }
+                Invoke(nameof(EnablePhysics), delayBeforePhysics);
             }
         }
-
-        if (stabilizationDelay > 0f)
-        {
-            yield return new WaitForSeconds(stabilizationDelay);
-        }
-
-        if (autoEnablePhysicsAfterPrepare)
-        {
-            EnablePhysics();
-        }
     }
 
-    [Header("Variación Visual")]
-    [Range(0f, 0.2f)] public float colorVariation = 0.12f;
-
-    [ContextMenu("Construir Torre Estable")]
+    [ContextMenu("Construir Torre Jenga (NewJengaBlock)")]
     public void BuildTower()
     {
+        // 1. Limpiar objetos hijos anteriores
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
             DestroyImmediate(transform.GetChild(i).gameObject);
         }
 
-        float groundY = transform.position.y;
+        if (blockPrefab == null)
+        {
+            Debug.LogError("¡Por favor asigna el Prefab (NewJengaBlock) en el Inspector!", this);
+            return;
+        }
+
+        AutoDetectDimensions();
+
+        Vector3 origin = transform.position;
         if (surfacePlane != null)
         {
             Collider planeCollider = surfacePlane.GetComponent<Collider>();
-            groundY = (planeCollider != null) ? planeCollider.bounds.max.y : surfacePlane.position.y;
+            if (planeCollider != null)
+            {
+                Bounds b = planeCollider.bounds;
+                origin = new Vector3(b.center.x, b.max.y, b.center.z);
+            }
+            else
+            {
+                origin = surfacePlane.position;
+            }
         }
 
-        float centerX = transform.position.x;
-        float centerZ = transform.position.z;
-
+        // 3. Construir los 18 pisos usando la lógica precisa de Bounds de superficie
         for (int floor = 0; floor < totalFloors; floor++)
         {
             bool isEvenFloor = (floor % 2 == 0);
-            
-            // Sumamos el microGap para dar espacio de reposo
-            float currentY = groundY + (floor * (blockHeight + microGap)) + (blockHeight / 2f);
+            float currentY = origin.y + (blockHeight / 2f) + extraSpawnHeight + (floor * (blockHeight + microGap));
 
             GameObject floorParent = new GameObject($"Floor_{floor + 1}");
-            floorParent.transform.SetParent(transform);
+            floorParent.transform.SetParent(transform, true);
 
             for (int i = 0; i < 3; i++)
             {
-                // Separación horizontal ligeramente holgada
                 float offset = (i - 1) * (blockWidth + microGap); 
-                Vector3 spawnPos;
-                Quaternion rotation;
+                
+                Vector3 spawnPos = isEvenFloor
+                    ? new Vector3(origin.x + offset, currentY, origin.z)
+                    : new Vector3(origin.x, currentY, origin.z + offset);
 
-                if (isEvenFloor)
-                {
-                    spawnPos = new Vector3(centerX + offset, currentY, centerZ);
-                    rotation = Quaternion.Euler(0, 90, 0);
-                }
-                else
-                {
-                    spawnPos = new Vector3(centerX, currentY, centerZ + offset);
-                    rotation = Quaternion.identity;
-                }
+                Quaternion rotation = isEvenFloor
+                    ? Quaternion.identity
+                    : Quaternion.Euler(0, 90, 0);
 
                 GameObject block = Instantiate(blockPrefab, spawnPos, rotation, floorParent.transform);
-                
+                block.name = $"Block_{floor + 1}_{i + 1}";
+                block.transform.localScale = new Vector3(blockWidth, blockHeight, blockLength);
+
                 Rigidbody rb = block.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
-                    rb.isKinematic = true; // Inicia inmóvil
-                   
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                    rb.useGravity = false;
+                    rb.isKinematic = keepKinematicOnSpawn;
                 }
 
-                Renderer rend = block.GetComponent<Renderer>();
-                if (rend != null)
+                JengaBlock jengaBlock = block.GetComponent<JengaBlock>();
+                if (jengaBlock == null)
                 {
-                    Material uniqueMat = new Material(rend.sharedMaterial);
-                    float randomFactor = 1f + Random.Range(-colorVariation, colorVariation);
-                    
-                    if (uniqueMat.HasProperty("_BaseColor"))
-                        uniqueMat.SetColor("_BaseColor", uniqueMat.GetColor("_BaseColor") * randomFactor);
-                    else if (uniqueMat.HasProperty("_Color"))
-                        uniqueMat.SetColor("_Color", uniqueMat.GetColor("_Color") * randomFactor);
+                    jengaBlock = block.AddComponent<JengaBlock>();
+                }
+                jengaBlock.floorLevel = floor + 1;
 
-                    rend.material = uniqueMat;
+                if (colorVariation > 0f)
+                {
+                    Renderer rend = block.GetComponent<Renderer>();
+                    if (rend != null && rend.sharedMaterial != null)
+                    {
+                        Material uniqueMat = new Material(rend.sharedMaterial);
+                        float randomFactor = 1f + Random.Range(-colorVariation, colorVariation);
+                        
+                        if (uniqueMat.HasProperty("_BaseColor"))
+                            uniqueMat.SetColor("_BaseColor", uniqueMat.GetColor("_BaseColor") * randomFactor);
+                        else if (uniqueMat.HasProperty("_Color"))
+                            uniqueMat.SetColor("_Color", uniqueMat.GetColor("_Color") * randomFactor);
+
+                        rend.material = uniqueMat;
+                    }
                 }
             }
         }
-        Debug.Log("¡Torre generada con holgura física antiexplosión!");
+
+        Debug.Log($"¡Torre Jenga construida con éxito ({totalFloors * 3} bloques) usando la superficie del suelo!");
     }
 
-    [ContextMenu("Activar Físicas")]
+    private void AutoDetectDimensions()
+    {
+        if (blockPrefab == null) return;
+
+        Vector3 prefabScale = blockPrefab.transform.localScale;
+        if (prefabScale.x > 0 && prefabScale.y > 0 && prefabScale.z > 0)
+        {
+            blockWidth = prefabScale.x;  // 0.025m
+            blockHeight = prefabScale.y; // 0.015m
+            blockLength = prefabScale.z; // 0.075m
+        }
+    }
+
     [ContextMenu("Activar Físicas")]
     public void EnablePhysics()
     {
         if (physicsEnabled) return;
-        physicsEnabled = true; // lo marcamos ya para bloquear ejecuciones duplicadas durante la corrutina
+        physicsEnabled = true;
         StartCoroutine(EnablePhysicsGradually());
     }
 
     private IEnumerator EnablePhysicsGradually()
     {
+        if (detachTowerFromTracking && transform.parent != null)
+        {
+            transform.SetParent(null, true);
+        }
+
         int totalRbs = 0;
 
-        // Recorremos cada "Floor_X" (child de este objeto) de abajo hacia arriba
-        for (int i = 0; i < transform.childCount; i++)
+        for (int i = transform.childCount - 1; i >= 0; i--)
         {
             Transform floorParent = transform.GetChild(i);
             Rigidbody[] floorRbs = floorParent.GetComponentsInChildren<Rigidbody>(true);
@@ -192,9 +191,9 @@ public class JengaTowerBuilder : MonoBehaviour
             }
 
             totalRbs += floorRbs.Length;
-            yield return new WaitForFixedUpdate(); // deja que el solver "digiera" este piso antes del siguiente
+            yield return new WaitForFixedUpdate();
         }
 
-        Debug.Log($"Físicas activadas de forma segura (gradual) en {totalRbs} bloques.");
+        Debug.Log($"Físicas activadas de forma limpia (de arriba a abajo) en {totalRbs} bloques.");
     }
 }
