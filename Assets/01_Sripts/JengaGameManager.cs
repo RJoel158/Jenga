@@ -298,9 +298,16 @@ public class JengaGameManager : MonoBehaviour
     {
         StopAllCoroutines();
 
-        // Restablecer contadores físicos de la torre usando currentTopFloor o un valor predeterminado (ej. 18)
         currentTopFloor = 18;
         blocksOnTopFloor = 3;
+
+        // Reiniciar el monitor de caídas
+        JengaTowerMonitor monitor = Object.FindFirstObjectByType<JengaTowerMonitor>();
+        if (monitor != null)
+        {
+            Destroy(monitor); // Lo destruimos y recreamos para que su "checkTimer" vuelva a empezar limpio
+        }
+        gameObject.AddComponent<JengaTowerMonitor>();
 
         JengaFloorTest floorTest = Object.FindFirstObjectByType<JengaFloorTest>();
         if (floorTest != null)
@@ -308,21 +315,8 @@ public class JengaGameManager : MonoBehaviour
             floorTest.SpawnTower();
         }
 
-        ARJengaTowerSpawner spawner = Object.FindFirstObjectByType<ARJengaTowerSpawner>();
-        if (spawner != null)
-        {
-            spawner.BuildTower();
-        }
-
-        JengaTowerBuilder builder = Object.FindFirstObjectByType<JengaTowerBuilder>();
-        if (builder != null)
-        {
-            builder.BuildTower();
-        }
-
         StartGame();
     }
-
     // Interfaz gráfica Móvil OnGUI elegante, estilizada y moderna
     void OnGUI()
     {
