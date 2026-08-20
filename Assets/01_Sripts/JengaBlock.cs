@@ -6,10 +6,11 @@ using System.Collections;
 public class JengaBlock : MonoBehaviour
 {
     [Header("Datos de Reglas")]
-    public int floorLevel;                 // Nivel del piso
-    public bool hasFallen = false;           // Evita ejecuciones duplicadas
-    public bool wasTouchedByPlayer = false;  // Marca si fue interactuado por el usuario
-    public bool isExtracting = false;        // Estado de extracción en proceso
+    public int floorLevel; 
+    public bool hasFallen = false; 
+    public bool wasTouchedByPlayer = false;
+    public bool isExtracting = false; 
+    public bool isBeingDragged = false;
 
     private Rigidbody rb;
     private Vector3 initialPosition;
@@ -23,15 +24,9 @@ public class JengaBlock : MonoBehaviour
         rb.centerOfMass = Vector3.zero;
     }
 
-    /// <summary>
-    /// Desliza el bloque suavemente fuera de la torre como una animación.
-    /// </summary>
-    /// <param name="direction">Dirección del movimiento</param>
-    /// <param name="distance">Distancia a recorrer para salir de la estructura</param>
-    /// <param name="duration">Tiempo en segundos que dura el deslizamiento</param>
     public void ExtractBlockSmoothly(Vector3 direction, float distance = 0.75f, float duration = 0.3f)
     {
-        if (isExtracting) return;
+        if (isExtracting || isBeingDragged) return;
         StartCoroutine(SmoothExtractionRoutine(direction, distance, duration));
     }
 
@@ -39,47 +34,87 @@ public class JengaBlock : MonoBehaviour
     {
         isExtracting = true;
         wasTouchedByPlayer = true;
-
         if (rb == null) rb = GetComponent<Rigidbody>();
 
-        // Desactivamos la física momentáneamente para que se deslice de forma limpia sin explotar
         rb.isKinematic = true;
-
         Vector3 startPos = transform.position;
-        Vector3 targetPos = startPos + (direction.normalized * distance);
+        Vector3 targetPos = startPos + direction.normalized * distance;
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
-            
-            // Curva de suavizado (SmoothStep) para efecto de movimiento manual
-            t = t * t * (3f - 2f * t); 
-            
+            t = t * t * (3f - 2f * t); // SmoothStep
             transform.position = Vector3.Lerp(startPos, targetPos, t);
             yield return null;
         }
 
-        // Una vez fuera de su nicho, devolvemos las físicas para que caiga por gravedad
+        rb.isKinematic = false;
+        rb.useGravity = true;
+        rb.WakeUp();
+        rb.linearVelocity = direction.normalized * 0.8f;
+        isExtracting = false;
+
+        Invoke(nameof(CheckRelocateAfterDrop), 0.3f);
+    }
+
+    public void StartArDrag()
+    {
+        if (isExtracting) return;
+        if (rb == null) rb = GetComponent<Rigidbody>();
+
+        isBeingDragged = true;
+        wasTouchedByPlayer = true;
+        rb.useGravity = false;
+        rb.isKinematic = true;
+        transform.SetParent(null, true);
+    }
+
+    public void StopArDrag(Vector3 throwVelocity)
+    {
+        if (!isBeingDragged) return;
+        isBeingDragged = false;
+
+        rb.useGravity = true;
         rb.isKinematic = false;
         rb.WakeUp();
-        rb.linearVelocity = direction.normalized * 0.8f; // Ligera inercia de salida
+        rb.linearVelocity = throwVelocity;
 
-        isExtracting = false;
+        // Si el bloque se soltó fuera de la torre, iniciar recolocación arriba
+        Invoke(nameof(CheckRelocateAfterDrop), 0.3f);
+    }
+
+    private void CheckRelocateAfterDrop()
+    {
+        if (wasTouchedByPlayer && !hasFallen)
+        {
+            hasFallen = true;
+            TriggerRelocation();
+        }
     }
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (isBeingDragged) return; 
+
         bool isGround = collision.gameObject.CompareTag("Ground") || collision.gameObject.name.Contains("Plane");
 
         if (isGround)
         {
-            // Solo si el jugador extrajo este bloque se reubica arriba
             if (wasTouchedByPlayer && !hasFallen)
             {
                 hasFallen = true;
-                Invoke(nameof(TriggerRelocation), 0.4f);
+                Invoke(nameof(TriggerRelocation), 0.3f);
+            }
+            else if (!wasTouchedByPlayer && !hasFallen)
+            {
+                hasFallen = true;
+                // Si cae un bloque que no fue sacado por el jugador -> La torre colapsó!
+                if (JengaGameManager.Instance != null)
+                {
+                    JengaGameManager.Instance.TriggerTowerCollapse($"Caída del bloque nivel {floorLevel}");
+                }
             }
         }
     }
@@ -93,17 +128,5 @@ public class JengaBlock : MonoBehaviour
 
         wasTouchedByPlayer = false;
         hasFallen = false;
-    }
-
-    public void ResetBlock()
-    {
-        if (rb == null) rb = GetComponent<Rigidbody>();
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        rb.Sleep();
-        transform.SetPositionAndRotation(initialPosition, initialRotation);
-        hasFallen = false;
-        wasTouchedByPlayer = false;
-        isExtracting = false;
     }
 }
