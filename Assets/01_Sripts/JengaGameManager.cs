@@ -305,7 +305,7 @@ public class JengaGameManager : MonoBehaviour
         JengaTowerMonitor monitor = Object.FindFirstObjectByType<JengaTowerMonitor>();
         if (monitor != null)
         {
-            Destroy(monitor); // Lo destruimos y recreamos para que su "checkTimer" vuelva a empezar limpio
+            Destroy(monitor); 
         }
         gameObject.AddComponent<JengaTowerMonitor>();
 
@@ -347,7 +347,7 @@ public class JengaGameManager : MonoBehaviour
         btnStyle.alignment = TextAnchor.MiddleCenter;
         btnStyle.normal.textColor = Color.white;
 
-        // 1. Botón Flotante de Reiniciar (Esquina Superior Derecha)
+       
         float resetBtnW = Mathf.Clamp(sw * 0.3f, 110f, 160f);
         float resetBtnH = Mathf.Clamp(sh * 0.05f, 40f, 55f);
         GUI.color = new Color(0.15f, 0.65f, 1f);
@@ -357,7 +357,6 @@ public class JengaGameManager : MonoBehaviour
         }
         GUI.color = Color.white;
 
-        // 2. Indicador del Estado AR (Esquina Superior Izquierda)
         float arPillW = Mathf.Clamp(sw * 0.45f, 180f, 260f);
         if (!isArTrackingStable)
         {
@@ -371,7 +370,7 @@ public class JengaGameManager : MonoBehaviour
         }
         GUI.color = Color.white;
 
-        // 3. Panel Principal de Juego (Centrado en la parte superior)
+
         float panelW = sw - 40f;
         float panelH = Mathf.Clamp(sh * 0.28f, 190f, 260f);
         GUILayout.BeginArea(new Rect(20, resetBtnH + 30, panelW, panelH));
