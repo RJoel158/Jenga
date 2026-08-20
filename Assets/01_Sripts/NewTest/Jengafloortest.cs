@@ -7,49 +7,50 @@ public class JengaFloorTest : MonoBehaviour
     [Header("Prefab del bloque")]
     public GameObject blockPrefab;
 
-    [Header("Dimensiones del bloque (deben coincidir con el prefab)")]
+    [Header("Dimensiones del bloque (NewJengaBlock)")]
     public float blockWidth = 0.025f;   // eje X
     public float blockHeight = 0.015f;  // eje Y
+    public float blockLength = 0.075f;  // eje Z
 
-    [Header("Referencia al suelo")]
+    [Header("Configuración de la Torre")]
+    public int floors = 18;
     public Transform surfacePlane; 
 
     [Header("Separación entre bloques")]
-    public float microGap = 0.002f;
+    public float microGap = 0.0004f;
 
     [Header("Timing / Altura de Spawn")]
-    public float delayAfterTracked = 3f;
-    public float extraSpawnHeight = 0.05f; 
+    public float delayAfterTracked = 0.5f;
+    public float extraSpawnHeight = 0.002f; 
+    public bool keepKinematicOnSpawn = true;
 
     private ObserverBehaviour observerBehaviour;
     private bool spawned = false;
 
     void Start()
     {
-        Debug.Log($"[JengaFloorTest] JengaSpawner lossyScale: {transform.lossyScale}");
-
+        AutoDetectDimensions();
         observerBehaviour = GetComponentInParent<ObserverBehaviour>();
 
         if (observerBehaviour != null)
         {
             observerBehaviour.OnTargetStatusChanged += OnTargetStatusChanged;
-            Debug.Log("[JengaFloorTest] Suscripto a eventos de tracking.");
         }
         else
         {
-            Debug.LogWarning("[JengaFloorTest] No se encontró ObserverBehaviour en los padres. Spawneando directo (sin esperar tracking).");
             StartCoroutine(SpawnAfterDelay());
         }
     }
 
     private void OnTargetStatusChanged(ObserverBehaviour behaviour, TargetStatus status)
     {
-        bool isTracked = status.Status == Status.TRACKED || status.Status == Status.EXTENDED_TRACKED;
+        bool isTracked = status.Status == Status.TRACKED || 
+                         status.Status == Status.EXTENDED_TRACKED || 
+                         status.Status == Status.LIMITED;
 
         if (isTracked && !spawned)
         {
-            spawned = true; // marcamos ya para no disparar el coroutine de nuevo si sigue actualizando status
-            Debug.Log($"[JengaFloorTest] Target trackeado, esperando {delayAfterTracked}s antes de spawnear.");
+            spawned = true;
             StartCoroutine(SpawnAfterDelay());
         }
     }
@@ -63,47 +64,121 @@ public class JengaFloorTest : MonoBehaviour
     private IEnumerator SpawnAfterDelay()
     {
         yield return new WaitForSeconds(delayAfterTracked);
-        SpawnFirstFloor();
+        SpawnTower();
     }
 
-    [ContextMenu("Spawnear Primer Piso")]
-    public void SpawnFirstFloor()
+    private void AutoDetectDimensions()
+    {
+        if (blockPrefab == null) return;
+
+        Vector3 scale = blockPrefab.transform.localScale;
+        if (scale.x > 0 && scale.y > 0 && scale.z > 0)
+        {
+            blockWidth = scale.x;  // 0.025m
+            blockHeight = scale.y; // 0.015m
+            blockLength = scale.z; // 0.075m
+        }
+    }
+
+    [ContextMenu("Spawnear Torre Jenga Completa")]
+    public void SpawnTower()
     {
         if (blockPrefab == null)
         {
-            Debug.LogError("Falta asignar blockPrefab.");
+            Debug.LogError("[JengaFloorTest] Falta asignar blockPrefab en el Inspector.");
             return;
         }
         if (surfacePlane == null)
         {
-            Debug.LogError("Falta asignar surfacePlane.");
+            Debug.LogError("[JengaFloorTest] Falta asignar surfacePlane en el Inspector.");
             return;
         }
 
         Collider floorCollider = surfacePlane.GetComponent<Collider>();
         if (floorCollider == null)
         {
-            Debug.LogError("surfacePlane no tiene Collider.");
+            Debug.LogError("[JengaFloorTest] surfacePlane no tiene Collider.");
             return;
+        }
+
+        AutoDetectDimensions();
+
+        // Limpiar bloques anteriores
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            DestroyImmediate(transform.GetChild(i).gameObject);
         }
 
         Bounds b = floorCollider.bounds;
         Vector3 origin = new Vector3(b.center.x, b.max.y, b.center.z);
 
-        Debug.Log($"[JengaFloorTest] Suelo detectado en: {origin} (bounds min={b.min} max={b.max})");
+        Debug.Log($"[JengaFloorTest] Suelo detectado en: {origin} (bounds max.y={b.max.y})");
 
-        // Altura extra para asegurar que no haya colisión/superposición al spawnear
-        float spawnY = origin.y + (blockHeight / 2f) + extraSpawnHeight;
-
-        for (int i = 0; i < 3; i++)
+        // Construcción de los 18 pisos usando la lógica precisa de Bounds de superficie
+        for (int floor = 0; floor < floors; floor++)
         {
-            float offset = (i - 1) * (blockWidth + microGap);
-            Vector3 spawnPos = new Vector3(origin.x + offset, spawnY, origin.z);
+            bool isEvenFloor = (floor % 2 == 0);
+            float currentY = origin.y + (blockHeight / 2f) + extraSpawnHeight + floor * (blockHeight + microGap);
 
-            GameObject block = Instantiate(blockPrefab, spawnPos, Quaternion.identity, transform);
-            block.name = $"TestBlock_{i}";
+            GameObject floorParent = new GameObject($"Floor_{floor + 1}");
+            floorParent.transform.SetParent(transform, true);
 
-            Debug.Log($"[JengaFloorTest] Bloque {i} spawneado en {spawnPos} (world), lossyScale={block.transform.lossyScale}");
+            for (int i = 0; i < 3; i++)
+            {
+                float offset = (i - 1) * (blockWidth + microGap);
+                
+                Vector3 spawnPos = isEvenFloor
+                    ? new Vector3(origin.x + offset, currentY, origin.z)
+                    : new Vector3(origin.x, currentY, origin.z + offset);
+
+                Quaternion rotation = isEvenFloor
+                    ? Quaternion.identity
+                    : Quaternion.Euler(0f, 90f, 0f);
+
+                GameObject block = Instantiate(blockPrefab, spawnPos, rotation, floorParent.transform);
+                block.name = $"Block_{floor + 1}_{i + 1}";
+                block.transform.localScale = new Vector3(blockWidth, blockHeight, blockLength);
+
+                Rigidbody rb = block.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                    rb.useGravity = false;
+                    rb.isKinematic = keepKinematicOnSpawn;
+                }
+
+                JengaBlock jengaBlock = block.GetComponent<JengaBlock>();
+                if (jengaBlock == null)
+                {
+                    jengaBlock = block.AddComponent<JengaBlock>();
+                }
+                jengaBlock.floorLevel = floor + 1;
+            }
+        }
+
+        ConfigureGameManager(surfacePlane);
+        EnsureInputController();
+
+        Debug.Log($"[JengaFloorTest] Torre Jenga completa ({floors * 3} bloques) construida perfectamente sobre el suelo.");
+    }
+
+    private void ConfigureGameManager(Transform ground)
+    {
+        JengaGameManager manager = GetComponent<JengaGameManager>();
+        if (manager == null)
+        {
+            manager = gameObject.AddComponent<JengaGameManager>();
+        }
+
+        manager.Configure(ground, floors, blockWidth, blockHeight);
+    }
+
+    private static void EnsureInputController()
+    {
+        if (Object.FindFirstObjectByType<BlockLogic>() == null && Camera.main != null)
+        {
+            Camera.main.gameObject.AddComponent<BlockLogic>();
         }
     }
 }

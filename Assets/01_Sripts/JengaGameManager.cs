@@ -23,6 +23,21 @@ public class JengaGameManager : MonoBehaviour
 
     void Start()
     {
+        UpdateGroundHeight();
+    }
+
+    public void Configure(Transform plane, int initialFloors, float width, float height)
+    {
+        surfacePlane = plane;
+        currentTopFloor = initialFloors;
+        blocksOnTopFloor = 3;
+        blockWidth = width;
+        blockHeight = height;
+        UpdateGroundHeight();
+    }
+
+    private void UpdateGroundHeight()
+    {
         if (surfacePlane != null)
         {
             Collider col = surfacePlane.GetComponent<Collider>();

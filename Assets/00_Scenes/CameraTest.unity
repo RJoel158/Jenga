@@ -367,10 +367,13 @@ MonoBehaviour:
   blockPrefab: {fileID: 7160432114029522204, guid: 666ed6f0ccf408148985b69b5324ba89, type: 3}
   blockWidth: 0.025
   blockHeight: 0.015
+  blockLength: 0.075
+  floors: 18
   surfacePlane: {fileID: 1734967183}
   microGap: 0.002
   delayAfterTracked: 3
   extraSpawnHeight: 0.05
+  keepKinematicOnSpawn: 1
 --- !u!1 &1201365791
 GameObject:
   m_ObjectHideFlags: 0
@@ -669,6 +672,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5719245596599109958, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: blockPrefab
+      value: 
+      objectReference: {fileID: 7160432114029522204, guid: 666ed6f0ccf408148985b69b5324ba89, type: 3}
     - target: {fileID: 5756170376412664413, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
