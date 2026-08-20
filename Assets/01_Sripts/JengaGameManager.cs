@@ -6,13 +6,13 @@ public class JengaGameManager : MonoBehaviour
     public static JengaGameManager Instance;
 
     [Header("Dimensiones de Jenga")]
-    public float blockWidth = 0.25f;
-    public float blockHeight = 0.15f;
+    public float blockWidth = 0.05f;
+    public float blockHeight = 0.03f;
     public Transform surfacePlane;
 
     [Header("Estado de la Torre")]
     public int currentTopFloor = 18;
-    public int blocksOnTopFloor = 0; // Cantidad de bloques en el piso actual (0, 1 o 2)
+    public int blocksOnTopFloor = 3;
 
     private float baseGroundY;
 
@@ -23,11 +23,25 @@ public class JengaGameManager : MonoBehaviour
 
     void Start()
     {
-        if (surfacePlane != null)
-        {
-            Collider col = surfacePlane.GetComponent<Collider>();
-            baseGroundY = (col != null) ? col.bounds.max.y : surfacePlane.position.y;
-        }
+        UpdateGroundHeight();
+    }
+
+    public void Configure(Transform plane, int initialFloors, float width, float height)
+    {
+        surfacePlane = plane;
+        currentTopFloor = initialFloors;
+        blocksOnTopFloor = 3;
+        blockWidth = width;
+        blockHeight = height;
+        UpdateGroundHeight();
+    }
+
+    private void UpdateGroundHeight()
+    {
+        if (surfacePlane == null) return;
+
+        Collider col = surfacePlane.GetComponent<Collider>();
+        baseGroundY = col != null ? col.bounds.max.y : surfacePlane.position.y;
     }
 
     /// <summary>
@@ -52,13 +66,11 @@ public class JengaGameManager : MonoBehaviour
         
         if (rb != null)
         {
-            // CORRECCIÓN UNITY 6: Primero se resetean las velocidades MIENTRAS es dinámico...
             if (!rb.isKinematic)
             {
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
-            // ... Y LUEGO se activa el modo cinemático.
             rb.isKinematic = true;
         }
 
@@ -69,40 +81,40 @@ public class JengaGameManager : MonoBehaviour
             blocksOnTopFloor = 0;
         }
 
-        // Calcular posición y orientación según paridad de nivel
-        bool isEvenFloor = (currentTopFloor % 2 == 0);
-        float targetY = baseGroundY + ((currentTopFloor - 1) * blockHeight) + (blockHeight / 2f);
+        Transform parentTransform = (surfacePlane != null && surfacePlane.parent != null) ? surfacePlane.parent : transform;
+        
+        float tableThickness = surfacePlane != null ? surfacePlane.localScale.y : 0.012f;
+        float localY = tableThickness + ((currentTopFloor - 1) * blockHeight) + (blockHeight / 2f);
         float offset = (blocksOnTopFloor - 1) * blockWidth;
 
-        Vector3 targetPos;
-        Quaternion targetRot;
+        bool isEvenFloor = (currentTopFloor % 2 == 0);
+        Vector3 localPos = isEvenFloor
+            ? new Vector3(0f, localY, offset)
+            : new Vector3(offset, localY, 0f);
+        Quaternion localRot = isEvenFloor
+            ? Quaternion.identity
+            : Quaternion.Euler(0f, 90f, 0f);
 
-        if (isEvenFloor)
-        {
-            targetPos = new Vector3(transform.position.x + offset, targetY, transform.position.z);
-            targetRot = Quaternion.Euler(0, 90, 0);
-        }
-        else
-        {
-            targetPos = new Vector3(transform.position.x, targetY, transform.position.z + offset);
-            targetRot = Quaternion.identity;
-        }
+        Vector3 targetPos = parentTransform.TransformPoint(localPos);
+        Quaternion targetRot = parentTransform.rotation * localRot;
 
         // Actualizar datos del bloque
         block.floorLevel = currentTopFloor;
         block.hasFallen = false;
 
-        // Reposicionar
+        // Reanclarlo a la torre en espacio mundial
+        block.transform.SetParent(parentTransform, true);
         block.transform.SetPositionAndRotation(targetPos, targetRot);
         blocksOnTopFloor++;
 
         yield return new WaitForSeconds(0.1f);
 
-        // Reactivar físicas de forma estable
         if (rb != null)
         {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.useGravity = true;
             rb.isKinematic = false;
-            rb.WakeUp();
         }
     }
 }
