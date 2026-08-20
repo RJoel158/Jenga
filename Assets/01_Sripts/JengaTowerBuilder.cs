@@ -184,10 +184,10 @@ public class JengaTowerBuilder : MonoBehaviour
                     rb.mass = physicsMassOverride;
                 }
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
-                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                 rb.useGravity = true;
                 rb.isKinematic = false;
-                rb.WakeUp();
+                rb.Sleep(); // Mantiene reposo estático fino hasta ser tocados por el jugador
             }
 
             totalRbs += floorRbs.Length;

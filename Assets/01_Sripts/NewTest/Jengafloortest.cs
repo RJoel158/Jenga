@@ -181,9 +181,11 @@ public class JengaFloorTest : MonoBehaviour
 
     private IEnumerator EnablePhysicsGradually()
     {
+        yield return new WaitForSeconds(0.2f);
         int totalRbs = 0;
 
-        for (int i = 0; i < transform.childCount; i++)
+        // Recorrer los pisos de ARRIBA a ABAJO para que la gravedad asiente la torre de forma limpia
+        for (int i = transform.childCount - 1; i >= 0; i--)
         {
             Transform floorParent = transform.GetChild(i);
             Rigidbody[] floorRbs = floorParent.GetComponentsInChildren<Rigidbody>(true);
@@ -193,17 +195,17 @@ public class JengaFloorTest : MonoBehaviour
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
-                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                 rb.useGravity = true;
                 rb.isKinematic = false;
-                rb.WakeUp();
+                rb.Sleep(); // Duerme los cuerpos físicos para que queden en reposo estático fino hasta ser tocados
             }
 
             totalRbs += floorRbs.Length;
             yield return new WaitForFixedUpdate(); 
         }
 
-        Debug.Log($"[JengaFloorTest] Física activada gradualmente en {totalRbs} bloques.");
+        Debug.Log($"[JengaFloorTest] Física activada en reposo estable (de arriba a abajo) en {totalRbs} bloques.");
     }
 
     private void ConfigureGameManager(Transform ground)

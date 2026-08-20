@@ -210,10 +210,10 @@ public class ARJengaTowerSpawner : MonoBehaviour
                     rb.angularVelocity = Vector3.zero;
                     rb.mass = 0.08f;
                     rb.interpolation = RigidbodyInterpolation.Interpolate;
-                    rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                    rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                     rb.useGravity = true;
                     rb.isKinematic = false;
-                    rb.WakeUp();
+                    rb.Sleep(); // Mantiene reposo estático fino hasta ser tocados por el jugador
                 }
             }
 

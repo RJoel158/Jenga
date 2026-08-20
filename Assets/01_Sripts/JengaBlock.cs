@@ -18,10 +18,29 @@ public class JengaBlock : MonoBehaviour
 
     void Start()
     {
+        Physics.defaultSolverIterations = 20;
+        Physics.defaultSolverVelocityIterations = 10;
+
         rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.mass = 0.08f;
+            rb.linearDamping = 0.15f;
+            rb.angularDamping = 0.4f;
+            rb.solverIterations = 20;
+            rb.solverVelocityIterations = 10;
+            rb.centerOfMass = Vector3.zero;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+        }
+
+        BoxCollider col = GetComponent<BoxCollider>();
+        if (col != null)
+        {
+            col.size = new Vector3(0.98f, 0.98f, 0.98f);
+        }
+
         initialPosition = transform.position;
         initialRotation = transform.rotation;
-        rb.centerOfMass = Vector3.zero;
     }
 
     public void ExtractBlockSmoothly(Vector3 direction, float distance = 0.75f, float duration = 0.3f)
