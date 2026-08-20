@@ -156,13 +156,13 @@ public class JengaFloorTest : MonoBehaviour
                 Rigidbody rb = block.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
-                    rb.mass = 0.12f;
-                    rb.linearDamping = 0.5f;
-                    rb.angularDamping = 0.8f;
+                    rb.mass = 1.5f;
+                    rb.linearDamping = 2f;
+                    rb.angularDamping = 3f;
                     rb.linearVelocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
                     rb.interpolation = RigidbodyInterpolation.Interpolate;
-                    rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                    rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
                     rb.isKinematic = true;
                     rb.useGravity = false;
                 }

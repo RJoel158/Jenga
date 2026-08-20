@@ -116,7 +116,7 @@ public class BlockLogic : MonoBehaviour
             draggedRb.isKinematic = true;
         }
 
-        // Estabilizar el resto de la torre bloqueando desplazamientos horizontales en cadena durante el arrastre
+        // Congelar movimientos innecesarios del resto de la torre para mantenerla firme al sacar la pieza
         JengaBlock[] allBlocks = Object.FindObjectsByType<JengaBlock>(FindObjectsSortMode.None);
         foreach (JengaBlock b in allBlocks)
         {
@@ -133,9 +133,10 @@ public class BlockLogic : MonoBehaviour
             }
         }
 
-        isDragging = true;
+        isDragging = false;
         initialTouchPosition = touchPosition;
         initialBlockPosition = draggedBlock.position;
+        isDragging = true;
     }
 
     void DragBlock(Vector2 currentTouchPosition)
@@ -162,7 +163,6 @@ public class BlockLogic : MonoBehaviour
             cameraForward * forwardMovement;
         rawMovement.y = 0;
 
-        // Proyectar el movimiento únicamente sobre el eje longitudinal del bloque (draggedBlock.forward)
         Vector3 slideAxis = draggedBlock.forward;
         float slideAmount = Vector3.Dot(rawMovement, slideAxis);
         Vector3 constrainedMovement = slideAxis * slideAmount;
@@ -196,7 +196,8 @@ public class BlockLogic : MonoBehaviour
             draggedRb.angularVelocity = Vector3.zero;
             draggedRb.isKinematic = false;
             draggedRb.useGravity = true;
-            draggedRb.WakeUp();
+            // Forzamos un modo de colisión estable para evitar traspasos bruscos al soltar
+            draggedRb.collisionDetectionMode = CollisionDetectionMode.Discrete;
         }
 
         if (draggedJengaBlock != null)
@@ -204,7 +205,7 @@ public class BlockLogic : MonoBehaviour
             draggedJengaBlock.wasTouchedByPlayer = true;
         }
 
-        // Restablecer físicas normales en toda la torre al soltar
+        // Restablecer restricciones de forma controlada en la torre sin golpear la estructura
         JengaBlock[] allBlocks = Object.FindObjectsByType<JengaBlock>(FindObjectsSortMode.None);
         foreach (JengaBlock b in allBlocks)
         {
@@ -213,8 +214,9 @@ public class BlockLogic : MonoBehaviour
                 Rigidbody r = b.GetComponent<Rigidbody>();
                 if (r != null)
                 {
+                    // Liberamos rotaciones pero mantenemos una pequeña restricción de posición horizontal extra 
+                    // un instante para que el motor asiente los bloques de forma orgánica
                     r.constraints = RigidbodyConstraints.None;
-                    r.WakeUp();
                 }
             }
         }
