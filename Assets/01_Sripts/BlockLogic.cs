@@ -17,11 +17,6 @@ public class BlockLogic : MonoBehaviour
     void Start()
     {
         arCamera = Camera.main;
-        attachedJengaBlock = GetComponent<JengaBlock>();
-        if (attachedJengaBlock == null)
-        {
-            attachedJengaBlock = gameObject.AddComponent<JengaBlock>();
-        }
     }
 
     void Update()
@@ -32,18 +27,44 @@ public class BlockLogic : MonoBehaviour
         // Soporte táctil (Móvil)
         if (Input.touchCount > 0)
         {
-            case TouchPhase.Began:
-                StartDragging(touch.position);
-                break;
-            case TouchPhase.Moved:
-            case TouchPhase.Stationary:
-                if (isDragging)
-                {
-                    DragBlock(touch.position);
-                }
-                break;
-            case TouchPhase.Ended:
-            case TouchPhase.Canceled:
+            Touch touch = Input.GetTouch(0);
+
+            switch (touch.phase)
+            {
+                case TouchPhase.Began:
+                    TryStartDrag(touch.position);
+                    break;
+
+                case TouchPhase.Moved:
+                case TouchPhase.Stationary:
+                    if (isDragging)
+                    {
+                        DragBlock(touch.position);
+                    }
+                    break;
+
+                case TouchPhase.Ended:
+                case TouchPhase.Canceled:
+                    if (isDragging)
+                    {
+                        StopDragging();
+                    }
+                    break;
+            }
+        }
+        else
+        {
+            // Fallback para pruebas en Editor con Mouse
+            if (Input.GetMouseButtonDown(0))
+            {
+                TryStartDrag(Input.mousePosition);
+            }
+            else if (Input.GetMouseButton(0) && isDragging)
+            {
+                DragBlock(Input.mousePosition);
+            }
+            else if (Input.GetMouseButtonUp(0) && isDragging)
+            {
                 StopDragging();
             }
         }
@@ -57,20 +78,31 @@ public class BlockLogic : MonoBehaviour
             if (arCamera == null) return;
         }
 
-        Ray ray = arCamera.ScreenPointToRay(touchPosition);
+        Ray ray = arCamera.ScreenPointToRay(screenPosition);
         if (!Physics.Raycast(ray, out RaycastHit hit))
             return;
 
-   
         JengaBlock block = hit.collider.GetComponentInParent<JengaBlock>();
         if (block == null)
             return;
 
-        if (JengaGameManager.Instance != null &&
-            !JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
+        // Regla AR & Regla de Turno: Verificar estado de partida
+        if (JengaGameManager.Instance != null)
         {
-            Debug.LogWarning("[BlockLogic] No se puede mover un bloque del nivel superior activo.");
-            return;
+            if (!JengaGameManager.Instance.CanPlayerInteract())
+            {
+                Debug.LogWarning("[BlockLogic] No se puede mover el bloque en este momento (Esperando AR o turno).");
+                return;
+            }
+
+            // Regla 3: No se puede mover un bloque del nivel superior activo
+            if (!JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
+            {
+                Debug.LogWarning("[BlockLogic] No se puede mover un bloque del nivel superior activo.");
+                return;
+            }
+
+            JengaGameManager.Instance.OnBlockDragStart(block);
         }
 
         draggedBlock = block.transform;
@@ -85,8 +117,13 @@ public class BlockLogic : MonoBehaviour
         }
 
         isDragging = true;
-        initialTouchPosition = touchPosition;
+        initialTouchPosition = screenPosition;
         initialBlockPosition = draggedBlock.position;
+
+        if (draggedJengaBlock != null)
+        {
+            draggedJengaBlock.StartArDrag();
+        }
     }
 
     private void DragBlock(Vector2 currentTouchPosition)
@@ -108,28 +145,23 @@ public class BlockLogic : MonoBehaviour
         cameraRight.y = 0;
         cameraRight.Normalize();
 
-        Vector3 movement =
-            cameraRight * horizontalMovement +
-            cameraForward * forwardMovement;
-        movement.y = 0;
+        Vector3 movement = cameraRight * horizontalMovement + cameraForward * forwardMovement;
+        movement.y = 0; // Arrastre horizontal plano para sacar el bloque de la torre
 
- 
         draggedBlock.position = initialBlockPosition + movement;
     }
 
     private void StopDragging()
     {
-        if (draggedRb != null)
+        if (draggedJengaBlock != null)
         {
-  
+            draggedJengaBlock.StopArDrag(Vector3.zero);
+        }
+        else if (draggedRb != null)
+        {
             draggedRb.isKinematic = false;
             draggedRb.useGravity = true;
             draggedRb.WakeUp();
-        }
-
-        if (draggedJengaBlock != null)
-        {
-            draggedJengaBlock.wasTouchedByPlayer = true;
         }
 
         isDragging = false;
