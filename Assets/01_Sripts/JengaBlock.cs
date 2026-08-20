@@ -95,8 +95,16 @@ public class JengaBlock : MonoBehaviour
         hasFallen = false;
     }
 
+    void OnDisable()
+    {
+        CancelInvoke();
+        StopAllCoroutines();
+    }
+
     public void ResetBlock()
     {
+        CancelInvoke();
+        StopAllCoroutines();
         if (rb == null) rb = GetComponent<Rigidbody>();
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
