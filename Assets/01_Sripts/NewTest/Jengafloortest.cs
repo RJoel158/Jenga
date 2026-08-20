@@ -18,14 +18,31 @@ public class JengaFloorTest : MonoBehaviour
 
     private ObserverBehaviour observerBehaviour;
     private bool spawned = false;
+    private PhysicsMaterial jengaWoodMaterial;
 
     void Awake()
     {
-        Physics.defaultContactOffset = 0.0003f;
-        Physics.defaultSolverIterations = 30;
-        Physics.defaultSolverVelocityIterations = 10;
-        Physics.sleepThreshold = 0.001f;
-        Physics.defaultMaxDepenetrationVelocity = 5.0f;
+        Physics.defaultContactOffset = 0.0002f;
+        Physics.defaultSolverIterations = 40;
+        Physics.defaultSolverVelocityIterations = 15;
+        Physics.sleepThreshold = 0.0001f;
+        Physics.defaultMaxDepenetrationVelocity = 0.3f;
+    }
+
+    private PhysicsMaterial GetWoodMaterial()
+    {
+        if (jengaWoodMaterial == null)
+        {
+            jengaWoodMaterial = new PhysicsMaterial("JengaWoodMaterial")
+            {
+                dynamicFriction = 0.40f,
+                staticFriction = 0.50f,
+                bounciness = 0.0f,
+                frictionCombine = PhysicsMaterialCombine.Average,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+        }
+        return jengaWoodMaterial;
     }
 
     void Start()
@@ -99,17 +116,20 @@ public class JengaFloorTest : MonoBehaviour
         ConfigureGameManager(surfacePlane);
         EnsureInputController();
 
+        PhysicsMaterial woodMat = GetWoodMaterial();
+
         for (int floor = 0; floor < floors; floor++)
         {
             bool isEvenFloor = (floor % 2 == 0);
-            // targetY coloca el centro del bloque a la mitad de su altura SOBRE la superficie del suelo
-            float targetY = origin.y + (blockHeight / 2f) + floor * (blockHeight + microGap);
+            // targetY coloca el centro del bloque exactamente al nivel que le corresponde en Y (sin hueco vertical flotante)
+            float targetY = origin.y + (blockHeight / 2f) + (floor * blockHeight);
 
             GameObject floorParent = new GameObject($"Floor_{floor + 1}");
             floorParent.transform.SetParent(transform, true);
 
             for (int i = 0; i < 3; i++)
             {
+                // microGap aplica separación horizontal sutil entre los 3 bloques del mismo nivel
                 float offset = (i - 1) * (blockWidth + microGap);
 
                 Vector3 spawnPos = isEvenFloor
@@ -124,10 +144,18 @@ public class JengaFloorTest : MonoBehaviour
                 block.name = $"Block_{floor + 1}_{i + 1}";
                 block.transform.localScale = new Vector3(blockWidth, blockHeight, blockLength);
 
+                BoxCollider boxCol = block.GetComponent<BoxCollider>();
+                if (boxCol != null)
+                {
+                    boxCol.sharedMaterial = woodMat;
+                }
+
                 Rigidbody rb = block.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
-                    rb.mass = 0.08f;
+                    rb.mass = 0.12f;
+                    rb.linearDamping = 0.5f;
+                    rb.angularDamping = 0.8f;
                     rb.linearVelocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
                     rb.interpolation = RigidbodyInterpolation.Interpolate;
@@ -142,6 +170,8 @@ public class JengaFloorTest : MonoBehaviour
                     jengaBlock = block.AddComponent<JengaBlock>();
                 }
                 jengaBlock.floorLevel = floor + 1;
+
+                ApplyWoodColorVariation(block, floor, i);
             }
         }
 
@@ -162,6 +192,38 @@ public class JengaFloorTest : MonoBehaviour
         }
 
         Debug.Log($"[JengaFloorTest] Torre Jenga de {floors} pisos construida perfectamente sin penetración de suelo.");
+    }
+
+    private static void ApplyWoodColorVariation(GameObject block, int floor, int index)
+    {
+        Renderer renderer = block.GetComponent<Renderer>();
+        if (renderer == null) return;
+
+        // Generar un matiz pseudo-aleatorio consistente por bloque
+        int seed = ((floor + 1) * 31) + ((index + 1) * 17);
+        Random.State previousState = Random.state;
+        Random.InitState(seed);
+
+        float baseHue = Random.Range(0.07f, 0.11f);   // Tonos cálidos de madera (pino / roble)
+        float baseSat = Random.Range(0.22f, 0.45f);   // Variación de saturación
+        float baseVal = Random.Range(0.72f, 0.95f);   // Variación de brillo
+
+        Color woodColor = Color.HSVToRGB(baseHue, baseSat, baseVal);
+        Random.state = previousState;
+
+        MaterialPropertyBlock propBlock = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(propBlock);
+        propBlock.SetColor("_Color", woodColor);
+        propBlock.SetColor("_BaseColor", woodColor);
+        renderer.SetPropertyBlock(propBlock);
+
+        if (renderer.material != null)
+        {
+            if (renderer.material.HasProperty("_Color"))
+                renderer.material.color = woodColor;
+            else if (renderer.material.HasProperty("_BaseColor"))
+                renderer.material.SetColor("_BaseColor", woodColor);
+        }
     }
 
     private void CleanupDuplicateAndStaticObjects()

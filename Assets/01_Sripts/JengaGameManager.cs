@@ -209,8 +209,8 @@ public class JengaGameManager : MonoBehaviour
             }
         }
 
-        float extraHeight = 0.002f;
-        float targetY = origin.y + (blockHeight / 2f) + extraHeight + (currentTopFloor - 1) * (blockHeight + microGap);
+        float extraHeight = 0.0005f;
+        float targetY = origin.y + (blockHeight / 2f) + extraHeight + (currentTopFloor - 1) * blockHeight;
         float offset = (blocksOnTopFloor - 1) * (blockWidth + microGap);
 
         int floorIndex = currentTopFloor - 1;

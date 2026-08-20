@@ -21,27 +21,39 @@ public class BlockLogic : MonoBehaviour
 
     void Update()
     {
-        if (Input.touchCount == 0)
-            return;
-
-        Touch touch = Input.GetTouch(0);
-
-        switch (touch.phase)
+        if (Input.touchCount > 0)
         {
-            case TouchPhase.Began:
-                StartDragging(touch.position);
-                break;
-            case TouchPhase.Moved:
-            case TouchPhase.Stationary:
-                if (isDragging)
-                {
-                    DragBlock(touch.position);
-                }
-                break;
-            case TouchPhase.Ended:
-            case TouchPhase.Canceled:
-                StopDragging();
-                break;
+            Touch touch = Input.GetTouch(0);
+
+            switch (touch.phase)
+            {
+                case TouchPhase.Began:
+                    StartDragging(touch.position);
+                    break;
+                case TouchPhase.Moved:
+                case TouchPhase.Stationary:
+                    if (isDragging)
+                    {
+                        DragBlock(touch.position);
+                    }
+                    break;
+                case TouchPhase.Ended:
+                case TouchPhase.Canceled:
+                    StopDragging();
+                    break;
+            }
+        }
+        else if (Input.GetMouseButtonDown(0))
+        {
+            StartDragging(Input.mousePosition);
+        }
+        else if (Input.GetMouseButton(0) && isDragging)
+        {
+            DragBlock(Input.mousePosition);
+        }
+        else if (Input.GetMouseButtonUp(0) && isDragging)
+        {
+            StopDragging();
         }
     }
 
@@ -102,18 +114,35 @@ public class BlockLogic : MonoBehaviour
         cameraRight.y = 0;
         cameraRight.Normalize();
 
-        Vector3 movement =
+        Vector3 rawMovement =
             cameraRight * horizontalMovement +
             cameraForward * forwardMovement;
-        movement.y = 0;
+        rawMovement.y = 0;
 
-        draggedBlock.position = initialBlockPosition + movement;
+        // Proyectar el movimiento únicamente sobre el eje longitudinal del bloque (draggedBlock.forward)
+        // Esto previene empujones laterales que derriban los bloques contiguos.
+        Vector3 slideAxis = draggedBlock.forward;
+        float slideAmount = Vector3.Dot(rawMovement, slideAxis);
+        Vector3 constrainedMovement = slideAxis * slideAmount;
+
+        Vector3 targetPos = initialBlockPosition + constrainedMovement;
+
+        if (draggedRb != null)
+        {
+            draggedRb.MovePosition(targetPos);
+        }
+        else
+        {
+            draggedBlock.position = targetPos;
+        }
     }
 
     void StopDragging()
     {
         if (draggedRb != null)
         {
+            draggedRb.linearVelocity = Vector3.zero;
+            draggedRb.angularVelocity = Vector3.zero;
             draggedRb.isKinematic = false;
             draggedRb.useGravity = true;
             draggedRb.WakeUp();
