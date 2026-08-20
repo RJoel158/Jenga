@@ -40,6 +40,14 @@ public class JengaPlayerController : MonoBehaviour
                 JengaBlock block = hit.collider.GetComponent<JengaBlock>();
                 if (block != null && !block.isExtracting)
                 {
+                    JengaTowerBuilder builder = FindFirstObjectByType<JengaTowerBuilder>();
+                    if (builder != null)
+                    {
+                        builder.EnablePhysics();
+                    }
+
+                    // 2. Proceder con la extracción habitual
+                    DetermineAndExecuteSlide(block, hit);
                     if (JengaGameManager.Instance == null) return;
 
                     // Regla de Jenga: No retirar bloques del piso superior activo
@@ -53,6 +61,7 @@ public class JengaPlayerController : MonoBehaviour
                 }
             }
         }
+
     }
 
     private void DetermineAndExecuteSlide(JengaBlock block, RaycastHit hit)

@@ -251,7 +251,19 @@ MonoBehaviour:
     m_RotationOrder: 4
   OnTargetFound:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 169381316}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: 
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
   OnTargetLost:
     m_PersistentCalls:
       m_Calls: []
@@ -676,6 +688,10 @@ PrefabInstance:
       propertyPath: blockPrefab
       value: 
       objectReference: {fileID: 7160432114029522204, guid: 666ed6f0ccf408148985b69b5324ba89, type: 3}
+    - target: {fileID: 5719245596599109958, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
+      propertyPath: surfacePlane
+      value: 
+      objectReference: {fileID: 1734967183}
     - target: {fileID: 5756170376412664413, guid: 5a87ccdf937813b4f8f6b9ce2e0902a6, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
