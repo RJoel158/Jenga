@@ -8,20 +8,20 @@ public class JengaFloorTest : MonoBehaviour
     public GameObject blockPrefab;
 
     [Header("Dimensiones del bloque (NewJengaBlock)")]
-    public float blockWidth = 0.025f;   // eje X
-    public float blockHeight = 0.015f;  // eje Y
-    public float blockLength = 0.075f;  // eje Z
+    public float blockWidth = 0.025f;
+    public float blockHeight = 0.015f;
+    public float blockLength = 0.075f;
 
     [Header("Configuración de la Torre")]
     public int floors = 18;
     public Transform surfacePlane;
 
     [Header("Separación entre bloques")]
-    public float microGap = 0.0015f; 
+    public float microGap = 0.0005f;
 
     [Header("Timing / Altura de Spawn")]
     public float delayAfterTracked = 0.5f;
-    public float extraSpawnHeight = 0.002f;
+    public float extraSpawnHeight = 0f;
     public bool keepKinematicOnSpawn = true;
 
     private ObserverBehaviour observerBehaviour;
@@ -29,13 +29,11 @@ public class JengaFloorTest : MonoBehaviour
 
     void Awake()
     {
-        
-        Physics.defaultContactOffset = 0.0003f;     
-        Physics.defaultSolverIterations = 30;    
-        Physics.defaultSolverVelocityIterations = 12;
-        Physics.sleepThreshold = 0.001f;            
-
-        Debug.Log("[JengaFloorTest] Configuración de física ajustada por código para escala pequeña.");
+        Physics.defaultContactOffset = 0.0003f;
+        Physics.defaultSolverIterations = 80;
+        Physics.defaultSolverVelocityIterations = 20;
+        Physics.sleepThreshold = 0.001f;
+        Physics.defaultMaxDepenetrationVelocity = 0.1f;
     }
 
     void Start()
@@ -85,47 +83,30 @@ public class JengaFloorTest : MonoBehaviour
         Vector3 scale = blockPrefab.transform.localScale;
         if (scale.x > 0 && scale.y > 0 && scale.z > 0)
         {
-            blockWidth = scale.x;  // 0.025m
-            blockHeight = scale.y; // 0.015m
-            blockLength = scale.z; // 0.075m
+            blockWidth = scale.x;
+            blockHeight = scale.y;
+            blockLength = scale.z;
         }
     }
 
     [ContextMenu("Spawnear Torre Jenga Completa")]
     public void SpawnTower()
     {
-        if (blockPrefab == null)
-        {
-            Debug.LogError("[JengaFloorTest] Falta asignar blockPrefab en el Inspector.");
-            return;
-        }
-        if (surfacePlane == null)
-        {
-            Debug.LogError("[JengaFloorTest] Falta asignar surfacePlane en el Inspector.");
-            return;
-        }
+        if (blockPrefab == null || surfacePlane == null) return;
 
         Collider floorCollider = surfacePlane.GetComponent<Collider>();
-        if (floorCollider == null)
-        {
-            Debug.LogError("[JengaFloorTest] surfacePlane no tiene Collider.");
-            return;
-        }
+        if (floorCollider == null) return;
 
         AutoDetectDimensions();
 
-        
         for (int i = transform.childCount - 1; i >= 0; i--)
         {
             DestroyImmediate(transform.GetChild(i).gameObject);
         }
 
         Bounds b = floorCollider.bounds;
-        Vector3 origin = new Vector3(b.center.x, b.max.y, b.center.z);
+        Vector3 origin = new Vector3(b.center.x, b.max.y - (blockHeight / 2f), b.center.z);
 
-        Debug.Log($"[JengaFloorTest] Suelo detectado en: {origin} (bounds max.y={b.max.y})");
-
-        // Construcción de los pisos usando la lógica precisa de Bounds de superficie
         for (int floor = 0; floor < floors; floor++)
         {
             bool isEvenFloor = (floor % 2 == 0);
@@ -153,6 +134,7 @@ public class JengaFloorTest : MonoBehaviour
                 Rigidbody rb = block.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
+                    rb.mass = 0.015f;
                     rb.linearVelocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
                     rb.useGravity = false;
@@ -171,19 +153,20 @@ public class JengaFloorTest : MonoBehaviour
         ConfigureGameManager(surfacePlane);
         EnsureInputController();
 
-        Debug.Log($"[JengaFloorTest] Torre Jenga completa ({floors * 3} bloques) construida perfectamente sobre el suelo.");
-
         if (keepKinematicOnSpawn)
         {
-            StartCoroutine(EnablePhysicsGradually());
+            StartCoroutine(EnablePhysicsGraduallyWithLowGravity());
         }
     }
 
-    private IEnumerator EnablePhysicsGradually()
+    private IEnumerator EnablePhysicsGraduallyWithLowGravity()
     {
-        int totalRbs = 0;
+        yield return new WaitForSeconds(0.5f);
 
-        for (int i = 0; i < transform.childCount; i++)
+        Vector3 originalGravity = Physics.gravity;
+        Physics.gravity = new Vector3(0, -0.5f, 0);
+
+        for (int i = transform.childCount - 1; i >= 0; i--)
         {
             Transform floorParent = transform.GetChild(i);
             Rigidbody[] floorRbs = floorParent.GetComponentsInChildren<Rigidbody>(true);
@@ -193,17 +176,22 @@ public class JengaFloorTest : MonoBehaviour
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
-                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
                 rb.useGravity = true;
                 rb.isKinematic = false;
                 rb.WakeUp();
             }
 
-            totalRbs += floorRbs.Length;
-            yield return new WaitForFixedUpdate(); 
+            yield return new WaitForSeconds(0.05f);
         }
 
-        Debug.Log($"[JengaFloorTest] Física activada gradualmente en {totalRbs} bloques.");
+        yield return new WaitForSeconds(0.5f);
+        Physics.gravity = originalGravity;
+
+        foreach (Rigidbody rb in GetComponentsInChildren<Rigidbody>())
+        {
+            rb.WakeUp();
+        }
     }
 
     private void ConfigureGameManager(Transform ground)

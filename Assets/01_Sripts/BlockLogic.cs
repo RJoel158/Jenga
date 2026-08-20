@@ -57,7 +57,6 @@ public class BlockLogic : MonoBehaviour
         if (!Physics.Raycast(ray, out RaycastHit hit))
             return;
 
-   
         JengaBlock block = hit.collider.GetComponentInParent<JengaBlock>();
         if (block == null)
             return;
@@ -65,7 +64,6 @@ public class BlockLogic : MonoBehaviour
         if (JengaGameManager.Instance != null &&
             !JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
         {
-            Debug.LogWarning("[BlockLogic] No se puede mover un bloque del nivel superior activo.");
             return;
         }
 
@@ -109,7 +107,6 @@ public class BlockLogic : MonoBehaviour
             cameraForward * forwardMovement;
         movement.y = 0;
 
- 
         draggedBlock.position = initialBlockPosition + movement;
     }
 
@@ -117,7 +114,6 @@ public class BlockLogic : MonoBehaviour
     {
         if (draggedRb != null)
         {
-  
             draggedRb.isKinematic = false;
             draggedRb.useGravity = true;
             draggedRb.WakeUp();
