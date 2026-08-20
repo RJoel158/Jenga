@@ -96,10 +96,16 @@ public class JengaFloorTest : MonoBehaviour
     [ContextMenu("Spawnear Torre Jenga Limpia")]
     public void SpawnTower()
     {
-        if (blockPrefab == null || surfacePlane == null) return;
+        StopAllCoroutines();
+        StartCoroutine(SpawnTowerRoutine());
+    }
+
+    private IEnumerator SpawnTowerRoutine()
+    {
+        if (blockPrefab == null || surfacePlane == null) yield break;
 
         Collider floorCollider = surfacePlane.GetComponent<Collider>();
-        if (floorCollider == null) return;
+        if (floorCollider == null) yield break;
 
         AutoDetectDimensions();
         CleanupDuplicateAndStaticObjects();
@@ -110,7 +116,6 @@ public class JengaFloorTest : MonoBehaviour
         }
 
         Bounds b = floorCollider.bounds;
-        // origin.y es b.max.y (la superficie superior exacta del plano del suelo)
         Vector3 origin = new Vector3(b.center.x, b.max.y, b.center.z);
 
         ConfigureGameManager(surfacePlane);
@@ -121,7 +126,6 @@ public class JengaFloorTest : MonoBehaviour
         for (int floor = 0; floor < floors; floor++)
         {
             bool isEvenFloor = (floor % 2 == 0);
-            // targetY coloca el centro del bloque exactamente al nivel que le corresponde en Y (sin hueco vertical flotante)
             float targetY = origin.y + (blockHeight / 2f) + (floor * blockHeight);
 
             GameObject floorParent = new GameObject($"Floor_{floor + 1}");
@@ -129,7 +133,6 @@ public class JengaFloorTest : MonoBehaviour
 
             for (int i = 0; i < 3; i++)
             {
-                // microGap aplica separación horizontal sutil entre los 3 bloques del mismo nivel
                 float offset = (i - 1) * (blockWidth + microGap);
 
                 Vector3 spawnPos = isEvenFloor
@@ -160,8 +163,8 @@ public class JengaFloorTest : MonoBehaviour
                     rb.angularVelocity = Vector3.zero;
                     rb.interpolation = RigidbodyInterpolation.Interpolate;
                     rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-                    rb.useGravity = true;
                     rb.isKinematic = true;
+                    rb.useGravity = false;
                 }
 
                 JengaBlock jengaBlock = block.GetComponent<JengaBlock>();
@@ -175,7 +178,8 @@ public class JengaFloorTest : MonoBehaviour
             }
         }
 
-        // Descongelar las físicas en reposo estático fino (Sleep) para estabilidad absoluta
+        yield return null;
+
         for (int f = 0; f < transform.childCount; f++)
         {
             Transform floorGroup = transform.GetChild(f);
@@ -199,14 +203,13 @@ public class JengaFloorTest : MonoBehaviour
         Renderer renderer = block.GetComponent<Renderer>();
         if (renderer == null) return;
 
-        // Generar un matiz pseudo-aleatorio consistente por bloque
         int seed = ((floor + 1) * 31) + ((index + 1) * 17);
         Random.State previousState = Random.state;
         Random.InitState(seed);
 
-        float baseHue = Random.Range(0.07f, 0.11f);   // Tonos cálidos de madera (pino / roble)
-        float baseSat = Random.Range(0.22f, 0.45f);   // Variación de saturación
-        float baseVal = Random.Range(0.72f, 0.95f);   // Variación de brillo
+        float baseHue = Random.Range(0.07f, 0.11f);
+        float baseSat = Random.Range(0.22f, 0.45f);
+        float baseVal = Random.Range(0.72f, 0.95f);
 
         Color woodColor = Color.HSVToRGB(baseHue, baseSat, baseVal);
         Random.state = previousState;
