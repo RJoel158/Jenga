@@ -3,16 +3,15 @@ using System.Collections;
 using Vuforia;
 
 /// <summary>
-/// Controlador principal de reglas y turnos para el juego de Jenga AR.
-/// Reglas implementadas:
-/// 1. Inicia la partida con el Jugador 1.
-/// 2. Cada jugador mueve un único bloque por turno.
-/// 3. Prohibido retirar bloques del piso superior activo.
-/// 4. El bloque retirado debe colocarse sobre la torre.
-/// 5. El turno no acaba hasta transcurrir 5 segundos de evaluación de estabilidad.
-/// 6. El jugador en cuyo turno cae la torre pierde.
-/// 7. Turnos cíclicos entre 2, 3 o 4 jugadores (retorna al Jugador 1).
-/// 8. Manipulación bloqueada hasta que el seguimiento AR sea estable.
+/// Gestor principal de reglas y turnos de Jenga AR.
+/// Reglas:
+/// 1. Selección de 2, 3 o 4 jugadores (partida inicia con Jugador 1).
+/// 2. Prohibido retirar bloques del nivel superior activo (currentTopFloor).
+/// 3. Bloque retirado se recoloca automáticamente en la posición libre de la cima (con paridad 0°/90°).
+/// 4. Evaluación de estabilidad durante 5 segundos tras colocar el bloque arriba.
+/// 5. El jugador en cuyo turno cae la torre PERDIÓ.
+/// 6. Turno cíclico hacia el siguiente jugador (Jugador N -> Jugador 1).
+/// 7. Manipulación bloqueada si el tracking AR no es estable.
 /// </summary>
 public class JengaGameManager : MonoBehaviour
 {
@@ -33,14 +32,15 @@ public class JengaGameManager : MonoBehaviour
     public GameState currentState = GameState.WAITING_FOR_TRACKING;
     public float stabilityCheckDuration = 5.0f;
 
-    [Header("Dimensiones de Jenga")]
+    [Header("Dimensiones del Bloque")]
     public float blockWidth = 0.025f;
     public float blockHeight = 0.015f;
+    public float microGap = 0.0004f;
     public Transform surfacePlane;
 
     [Header("Estado de la Torre")]
     public int currentTopFloor = 18;
-    public int blocksOnTopFloor = 3;
+    public int blocksOnTopFloor = 3; // Cantidad de bloques en la cima (0, 1, 2 o 3)
 
     [Header("Tracking AR")]
     public bool isArTrackingStable = false;
@@ -122,7 +122,7 @@ public class JengaGameManager : MonoBehaviour
         hasMovedBlockThisTurn = false;
         currentMovedBlock = null;
         currentState = GameState.PLAYER_TURN;
-        Debug.Log($"¡Partida de Jenga Iniciada! Turno del Jugador {currentPlayerIndex}.");
+        Debug.Log($"¡Partida de Jenga Iniciada! Jugadores: {totalPlayers}. Turno del Jugador {currentPlayerIndex}.");
     }
 
     public void Configure(Transform plane, int initialFloors, float width, float height)
@@ -145,7 +145,7 @@ public class JengaGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Regla 8: La manipulación solo se habilita cuando el seguimiento AR sea estable.
+    /// Regla AR: Solo se permite interacción si el seguimiento AR es estable y es el turno activo.
     /// </summary>
     public bool CanPlayerInteract()
     {
@@ -157,7 +157,7 @@ public class JengaGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Regla 3: No se pueden retirar bloques del nivel superior activo.
+    /// Regla: No se pueden retirar bloques del piso superior activo.
     /// </summary>
     public bool CanTouchBlock(int blockFloor)
     {
@@ -165,7 +165,7 @@ public class JengaGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Regla 2: Cada jugador mueve un único bloque por turno.
+    /// Regla de Turno: Registra el inicio de extracción de 1 bloque.
     /// </summary>
     public void OnBlockDragStart(JengaBlock block)
     {
@@ -176,7 +176,7 @@ public class JengaGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Regla 4 & 5: Coloca el bloque retirado sobre la torre e inicia el conteo de 5 segundos de estabilidad.
+    /// Recoloca el bloque extraído en la posición correspondiente del nivel superior activo (cima).
     /// </summary>
     public void RelocateBlockToTop(JengaBlock block)
     {
@@ -199,34 +199,47 @@ public class JengaGameManager : MonoBehaviour
             rb.isKinematic = true;
         }
 
-        // Si el piso superior ya tiene 3 bloques, creamos un nuevo nivel arriba
+        // Si el piso superior ya completó sus 3 bloques, creamos un nuevo nivel arriba
         if (blocksOnTopFloor >= 3)
         {
             currentTopFloor++;
             blocksOnTopFloor = 0;
         }
 
-        Transform parentTransform = (surfacePlane != null && surfacePlane.parent != null) ? surfacePlane.parent : transform;
-        
-        float tableThickness = surfacePlane != null ? surfacePlane.localScale.y : 0.012f;
-        float localY = tableThickness + ((currentTopFloor - 1) * blockHeight) + (blockHeight / 2f);
-        float offset = (blocksOnTopFloor - 1) * blockWidth;
+        // Calcular posición del centro del suelo
+        Vector3 origin = transform.position;
+        if (surfacePlane != null)
+        {
+            Collider col = surfacePlane.GetComponent<Collider>();
+            if (col != null)
+            {
+                Bounds b = col.bounds;
+                origin = new Vector3(b.center.x, b.max.y, b.center.z);
+            }
+            else
+            {
+                origin = surfacePlane.position;
+            }
+        }
 
-        bool isEvenFloor = (currentTopFloor % 2 == 0);
-        Vector3 localPos = isEvenFloor
-            ? new Vector3(offset, localY, 0f)
-            : new Vector3(0f, localY, offset);
-        Quaternion localRot = isEvenFloor
+        float extraHeight = 0.002f;
+        float targetY = origin.y + (blockHeight / 2f) + extraHeight + (currentTopFloor - 1) * (blockHeight + microGap);
+        float offset = (blocksOnTopFloor - 1) * (blockWidth + microGap);
+
+        int floorIndex = currentTopFloor - 1;
+        bool isEvenFloor = (floorIndex % 2 == 0);
+
+        Vector3 targetPos = isEvenFloor
+            ? new Vector3(origin.x + offset, targetY, origin.z)
+            : new Vector3(origin.x, targetY, origin.z + offset);
+
+        Quaternion targetRot = isEvenFloor
             ? Quaternion.identity
             : Quaternion.Euler(0f, 90f, 0f);
-
-        Vector3 targetPos = parentTransform.TransformPoint(localPos);
-        Quaternion targetRot = parentTransform.rotation * localRot;
 
         block.floorLevel = currentTopFloor;
         block.hasFallen = false;
 
-        block.transform.SetParent(parentTransform, true);
         block.transform.SetPositionAndRotation(targetPos, targetRot);
         blocksOnTopFloor++;
 
@@ -239,7 +252,7 @@ public class JengaGameManager : MonoBehaviour
             rb.WakeUp();
         }
 
-        // REGLA 5: Evaluación de estabilidad durante 5 segundos
+        // Evaluación de estabilidad durante 5 segundos
         currentState = GameState.STABILITY_CHECK;
         stabilityTimer = stabilityCheckDuration;
 
@@ -251,7 +264,7 @@ public class JengaGameManager : MonoBehaviour
             yield return null;
         }
 
-        // Si pasaron los 5 segundos sin colapso -> El turno termina exitosamente
+        // Si pasaron los 5 segundos sin colapso -> El turno termina exitosamente y pasa al siguiente jugador
         if (!isGameOver)
         {
             AdvanceTurn();
@@ -259,7 +272,7 @@ public class JengaGameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Regla 7: Cambia de turno cíclicamente (retorna a Jugador 1).
+    /// Cambia de turno cíclicamente según el total de jugadores (2, 3 o 4).
     /// </summary>
     public void AdvanceTurn()
     {
@@ -274,11 +287,11 @@ public class JengaGameManager : MonoBehaviour
         hasMovedBlockThisTurn = false;
         currentMovedBlock = null;
         currentState = GameState.PLAYER_TURN;
-        Debug.Log($"¡Turno completado! Ahora es el turno del Jugador {currentPlayerIndex}.");
+        Debug.Log($"¡Turno completado exitosamente! Ahora es el turno del Jugador {currentPlayerIndex}.");
     }
 
     /// <summary>
-    /// Regla 6: El jugador que derriba la torre pierde.
+    /// Detecta el derrumbe de la torre y determina el Jugador perdedor del turno activo.
     /// </summary>
     public void TriggerTowerCollapse(string cause)
     {
@@ -289,7 +302,7 @@ public class JengaGameManager : MonoBehaviour
         currentState = GameState.GAME_OVER;
         StopAllCoroutines();
 
-        Debug.LogError($"💥 ¡LA TORRE SE CAYÓ! {cause}. El Jugador {losingPlayerIndex} HA PERDIDO LA PARTIDA.");
+        Debug.LogError($"💥 ¡LA TORRE HA CAÍDO! Motivo: {cause}. EL JUGADOR {losingPlayerIndex} HA PERDIDO.");
     }
 
     [ContextMenu("Reiniciar Partida")]
@@ -318,7 +331,7 @@ public class JengaGameManager : MonoBehaviour
         StartGame();
     }
 
-    // Interfaz de Usuario integrada para pantalla móvil
+    // Interfaz gráfica Móvil OnGUI
     void OnGUI()
     {
         GUIStyle headerStyle = new GUIStyle(GUI.skin.box);
@@ -334,7 +347,7 @@ public class JengaGameManager : MonoBehaviour
 
         GUILayout.BeginArea(new Rect(20, 20, Screen.width - 40, 240));
 
-        // Regla 8: Estado AR
+        // Estado AR
         if (!isArTrackingStable)
         {
             GUI.color = Color.red;
@@ -352,7 +365,7 @@ public class JengaGameManager : MonoBehaviour
 
         if (!isGameOver)
         {
-            // Regla 7: Selector de 2, 3 o 4 jugadores
+            // Selector de Jugadores (2, 3 o 4)
             GUILayout.BeginHorizontal();
             GUILayout.Label("Cantidad de Jugadores:", labelStyle, GUILayout.Width(200));
             for (int p = 2; p <= 4; p++)
@@ -370,7 +383,7 @@ public class JengaGameManager : MonoBehaviour
 
             GUILayout.Space(10);
 
-            // Regla 1 & 7: Indicador de Turno
+            // Turno del Jugador Activo
             Color playerColor = Color.cyan;
             switch (currentPlayerIndex)
             {
@@ -384,7 +397,7 @@ public class JengaGameManager : MonoBehaviour
             GUILayout.Box($"👤 TURNO ACTUAL: JUGADOR {currentPlayerIndex}", headerStyle);
             GUI.color = Color.white;
 
-            // Regla 5: Conteo de 5 segundos de estabilidad
+            // Timer de 5 Segundos de Estabilidad
             if (currentState == GameState.STABILITY_CHECK)
             {
                 GUI.color = Color.yellow;
@@ -393,12 +406,12 @@ public class JengaGameManager : MonoBehaviour
             }
             else if (currentState == GameState.PLAYER_TURN)
             {
-                GUILayout.Label("👇 Toca y desliza un bloque (que no sea del piso superior) para sacarlo.", labelStyle);
+                GUILayout.Label("👇 Toca y saca un bloque (que no sea del piso superior).", labelStyle);
             }
         }
         else
         {
-            // Regla 6: El jugador que derriba la torre pierde
+            // Pantalla de Derrota / Game Over
             GUI.color = Color.red;
             GUILayout.Box($"💥 ¡LA TORRE HA CAÍDO!\n❌ EL JUGADOR {losingPlayerIndex} HA PERDIDO LA PARTIDA", headerStyle);
             GUI.color = Color.white;

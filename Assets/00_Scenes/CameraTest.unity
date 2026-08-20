@@ -371,7 +371,7 @@ MonoBehaviour:
   floors: 10
   surfacePlane: {fileID: 1734967183}
   microGap: 0.002
-  delayAfterTracked: 3
+  delayAfterTracked: 2
   dropHeightOffset: 0.15
   settleTimePerFloor: 0.35
 --- !u!1 &1201365791
