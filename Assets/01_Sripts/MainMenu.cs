@@ -156,7 +156,7 @@ public class MainMenu : MonoBehaviour
 
     public void PlayGame()
     {
-        Debug.Log("[MainMenu] 🚀 Cargando escena de juego 'CameraTest'...");
+        Debug.Log("[MainMenu] Cargando escena de juego 'CameraTest'...");
         SceneManager.LoadScene("CameraTest");
     }
 

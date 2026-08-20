@@ -298,6 +298,10 @@ public class JengaGameManager : MonoBehaviour
     {
         StopAllCoroutines();
 
+        // Restablecer contadores físicos de la torre usando currentTopFloor o un valor predeterminado (ej. 18)
+        currentTopFloor = 18;
+        blocksOnTopFloor = 3;
+
         JengaFloorTest floorTest = Object.FindFirstObjectByType<JengaFloorTest>();
         if (floorTest != null)
         {
