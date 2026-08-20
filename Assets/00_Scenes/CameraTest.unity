@@ -369,6 +369,8 @@ MonoBehaviour:
   blockHeight: 0.015
   surfacePlane: {fileID: 1734967183}
   microGap: 0.002
+  delayAfterTracked: 3
+  extraSpawnHeight: 0.05
 --- !u!1 &1201365791
 GameObject:
   m_ObjectHideFlags: 0
@@ -1189,8 +1191,8 @@ MonoBehaviour:
   m_Script: {fileID: -1826476478, guid: 8a9a760f95896c34689febc965510927, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Vuforia.Unity.Engine.dll::Vuforia.VuforiaBehaviour
-  mWorldCenterMode: 2
-  mWorldCenter: {fileID: 0}
+  mWorldCenterMode: 0
+  mWorldCenter: {fileID: 768179326}
 --- !u!81 &2131726987
 AudioListener:
   m_ObjectHideFlags: 0

@@ -12,14 +12,14 @@ public class JengaFloorTest : MonoBehaviour
     public float blockHeight = 0.015f;  // eje Y
 
     [Header("Referencia al suelo")]
-    public Transform surfacePlane; // El objeto que tiene el MeshCollider del suelo
+    public Transform surfacePlane; 
 
     [Header("Separación entre bloques")]
     public float microGap = 0.002f;
 
     [Header("Timing / Altura de Spawn")]
-    public float delayAfterTracked = 3f;   // segundos a esperar tras detectar el target
-    public float extraSpawnHeight = 0.05f; // altura extra sobre el suelo, para evitar colisión inicial
+    public float delayAfterTracked = 3f;
+    public float extraSpawnHeight = 0.05f; 
 
     private ObserverBehaviour observerBehaviour;
     private bool spawned = false;
