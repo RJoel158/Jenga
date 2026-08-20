@@ -34,7 +34,7 @@ public class JengaGameManager : MonoBehaviour
     [Header("Dimensiones del Bloque")]
     public float blockWidth = 0.025f;
     public float blockHeight = 0.015f;
-    public float microGap = 0.0004f;
+    public float microGap = 0.00015f;
     public Transform surfacePlane;
 
     [Header("Estado de la Torre")]
@@ -211,7 +211,16 @@ public class JengaGameManager : MonoBehaviour
 
         float extraHeight = 0.0005f;
         float targetY = origin.y + (blockHeight / 2f) + extraHeight + (currentTopFloor - 1) * blockHeight;
-        float offset = (blocksOnTopFloor - 1) * (blockWidth + microGap);
+
+        // Orden equilibrado de colocación en nivel superior:
+        // 1er bloque (0 presentes) -> Centro (0)
+        // 2do bloque (1 presente)  -> Izquierda (-1)
+        // 3er bloque (2 presentes) -> Derecha (+1)
+        float offsetMultiplier = 0f;
+        if (blocksOnTopFloor == 1) offsetMultiplier = -1f;
+        else if (blocksOnTopFloor == 2) offsetMultiplier = 1f;
+
+        float offset = offsetMultiplier * (blockWidth + microGap);
 
         int floorIndex = currentTopFloor - 1;
         bool isEvenFloor = (floorIndex % 2 == 0);
@@ -236,7 +245,7 @@ public class JengaGameManager : MonoBehaviour
         {
             rb.isKinematic = false;
             rb.useGravity = true;
-            rb.WakeUp();
+            rb.Sleep();
         }
 
         // Evaluación de estabilidad durante 5 segundos

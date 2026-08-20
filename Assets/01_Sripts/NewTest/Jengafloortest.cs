@@ -13,7 +13,7 @@ public class JengaFloorTest : MonoBehaviour
     public int floors = 18;
     public Transform surfacePlane;
 
-    public float microGap = 0.0004f;
+    public float microGap = 0.00015f;
     public float delayAfterTracked = 0.3f;
 
     private ObserverBehaviour observerBehaviour;
@@ -26,7 +26,7 @@ public class JengaFloorTest : MonoBehaviour
         Physics.defaultSolverIterations = 40;
         Physics.defaultSolverVelocityIterations = 15;
         Physics.sleepThreshold = 0.0001f;
-        Physics.defaultMaxDepenetrationVelocity = 0.3f;
+        Physics.defaultMaxDepenetrationVelocity = 0.5f;
     }
 
     private PhysicsMaterial GetWoodMaterial()
@@ -35,8 +35,8 @@ public class JengaFloorTest : MonoBehaviour
         {
             jengaWoodMaterial = new PhysicsMaterial("JengaWoodMaterial")
             {
-                dynamicFriction = 0.40f,
-                staticFriction = 0.50f,
+                dynamicFriction = 0.25f,
+                staticFriction = 0.40f,
                 bounciness = 0.0f,
                 frictionCombine = PhysicsMaterialCombine.Average,
                 bounceCombine = PhysicsMaterialCombine.Minimum

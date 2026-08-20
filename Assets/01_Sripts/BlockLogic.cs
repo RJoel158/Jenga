@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class BlockLogic : MonoBehaviour
 {
-    [SerializeField] private float movementScale = 0.001f;
+    [SerializeField] private float movementScale = 0.0005f;
 
     private Camera arCamera;
     private bool isDragging = false;
@@ -57,6 +57,25 @@ public class BlockLogic : MonoBehaviour
         }
     }
 
+    private PhysicsMaterial zeroFrictionMaterial;
+    private PhysicsMaterial originalMaterial;
+
+    private PhysicsMaterial GetZeroFrictionMaterial()
+    {
+        if (zeroFrictionMaterial == null)
+        {
+            zeroFrictionMaterial = new PhysicsMaterial("ZeroFrictionMaterial")
+            {
+                dynamicFriction = 0f,
+                staticFriction = 0f,
+                bounciness = 0f,
+                frictionCombine = PhysicsMaterialCombine.Minimum,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+        }
+        return zeroFrictionMaterial;
+    }
+
     void StartDragging(Vector2 touchPosition)
     {
         if (arCamera == null)
@@ -83,11 +102,35 @@ public class BlockLogic : MonoBehaviour
         draggedJengaBlock = block;
         draggedRb = block.GetComponent<Rigidbody>();
 
+        BoxCollider box = block.GetComponent<BoxCollider>();
+        if (box != null)
+        {
+            originalMaterial = box.sharedMaterial;
+            box.sharedMaterial = GetZeroFrictionMaterial();
+        }
+
         if (draggedRb != null)
         {
             draggedRb.linearVelocity = Vector3.zero;
             draggedRb.angularVelocity = Vector3.zero;
             draggedRb.isKinematic = true;
+        }
+
+        // Estabilizar el resto de la torre bloqueando desplazamientos horizontales en cadena durante el arrastre
+        JengaBlock[] allBlocks = Object.FindObjectsByType<JengaBlock>(FindObjectsSortMode.None);
+        foreach (JengaBlock b in allBlocks)
+        {
+            if (b != null && b.transform != draggedBlock)
+            {
+                Rigidbody r = b.GetComponent<Rigidbody>();
+                if (r != null && !r.isKinematic)
+                {
+                    r.constraints = RigidbodyConstraints.FreezePositionX |
+                                    RigidbodyConstraints.FreezePositionZ |
+                                    RigidbodyConstraints.FreezeRotationX |
+                                    RigidbodyConstraints.FreezeRotationZ;
+                }
+            }
         }
 
         isDragging = true;
@@ -120,7 +163,6 @@ public class BlockLogic : MonoBehaviour
         rawMovement.y = 0;
 
         // Proyectar el movimiento únicamente sobre el eje longitudinal del bloque (draggedBlock.forward)
-        // Esto previene empujones laterales que derriban los bloques contiguos.
         Vector3 slideAxis = draggedBlock.forward;
         float slideAmount = Vector3.Dot(rawMovement, slideAxis);
         Vector3 constrainedMovement = slideAxis * slideAmount;
@@ -139,6 +181,15 @@ public class BlockLogic : MonoBehaviour
 
     void StopDragging()
     {
+        if (draggedBlock != null)
+        {
+            BoxCollider box = draggedBlock.GetComponent<BoxCollider>();
+            if (box != null && originalMaterial != null)
+            {
+                box.sharedMaterial = originalMaterial;
+            }
+        }
+
         if (draggedRb != null)
         {
             draggedRb.linearVelocity = Vector3.zero;
@@ -153,9 +204,25 @@ public class BlockLogic : MonoBehaviour
             draggedJengaBlock.wasTouchedByPlayer = true;
         }
 
+        // Restablecer físicas normales en toda la torre al soltar
+        JengaBlock[] allBlocks = Object.FindObjectsByType<JengaBlock>(FindObjectsSortMode.None);
+        foreach (JengaBlock b in allBlocks)
+        {
+            if (b != null)
+            {
+                Rigidbody r = b.GetComponent<Rigidbody>();
+                if (r != null)
+                {
+                    r.constraints = RigidbodyConstraints.None;
+                    r.WakeUp();
+                }
+            }
+        }
+
         isDragging = false;
         draggedBlock = null;
         draggedRb = null;
         draggedJengaBlock = null;
+        originalMaterial = null;
     }
 }
