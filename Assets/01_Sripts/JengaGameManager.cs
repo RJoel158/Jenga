@@ -2,16 +2,6 @@ using UnityEngine;
 using System.Collections;
 using Vuforia;
 
-/// <summary>
-/// Gestor principal de reglas, turnos y UI dinámica para Jenga AR.
-/// Reglas:
-/// - Selector dinámico de 2, 3 o 4 jugadores.
-/// - Turnos cíclicos con distintivos de color por jugador.
-/// - Restricción de retiro en el nivel superior activo.
-/// - Evaluación de estabilidad de 5 segundos tras recolocar un bloque arriba.
-/// - Detección automática del perdedor al derrumbarse la torre.
-/// - Botón de reinicio inmediato y modal de Game Over.
-/// </summary>
 public class JengaGameManager : MonoBehaviour
 {
     public static JengaGameManager Instance;
@@ -29,30 +19,27 @@ public class JengaGameManager : MonoBehaviour
     [Range(2, 4)] public int totalPlayers = 2;
     public int currentPlayerIndex = 1;
     public GameState currentState = GameState.WAITING_FOR_TRACKING;
-    public float stabilityCheckDuration = 5.0f;
+    public float stabilityCheckDuration = 3.0f;
 
-    [Header("Dimensiones del Bloque")]
+    [Header("Dimensiones")]
     public float blockWidth = 0.025f;
     public float blockHeight = 0.015f;
-    public float microGap = 0.00015f;
+    public float microGap = 0.00035f;
     public Transform surfacePlane;
 
     [Header("Estado de la Torre")]
-    public int currentTopFloor = 18;
+    public int currentTopFloor = 10;
     public int blocksOnTopFloor = 3;
 
     [Header("Tracking AR")]
     public bool isArTrackingStable = false;
     private ObserverBehaviour observer;
 
-    [Header("Estado de Partida")]
+    [Header("Estado")]
     public bool isGameOver = false;
     public int losingPlayerIndex = -1;
     public float stabilityTimer = 0f;
-    public bool hasMovedBlockThisTurn = false;
     public JengaBlock currentMovedBlock = null;
-
-    private float baseGroundY;
 
     void Awake()
     {
@@ -61,7 +48,6 @@ public class JengaGameManager : MonoBehaviour
 
     void Start()
     {
-        UpdateGroundHeight();
         observer = GetComponentInParent<ObserverBehaviour>();
 
         if (observer != null)
@@ -82,9 +68,7 @@ public class JengaGameManager : MonoBehaviour
     void OnDestroy()
     {
         if (observer != null)
-        {
             observer.OnTargetStatusChanged -= OnTargetStatusChanged;
-        }
     }
 
     private void OnTargetStatusChanged(ObserverBehaviour _, TargetStatus status)
@@ -106,7 +90,7 @@ public class JengaGameManager : MonoBehaviour
         }
         else
         {
-            if (currentState != GameState.GAME_OVER && currentState != GameState.STABILITY_CHECK)
+            if (currentState != GameState.GAME_OVER && currentState != GameState.STABILITY_CHECK && currentState != GameState.RELOCATING_BLOCK)
             {
                 currentState = GameState.WAITING_FOR_TRACKING;
             }
@@ -118,10 +102,8 @@ public class JengaGameManager : MonoBehaviour
         isGameOver = false;
         losingPlayerIndex = -1;
         currentPlayerIndex = 1;
-        hasMovedBlockThisTurn = false;
         currentMovedBlock = null;
         currentState = GameState.PLAYER_TURN;
-        Debug.Log($"[JengaGameManager] ¡Partida iniciada! Jugadores: {totalPlayers}. Turno del Jugador {currentPlayerIndex}.");
     }
 
     public void Configure(Transform plane, int initialFloors, float width, float height)
@@ -131,61 +113,58 @@ public class JengaGameManager : MonoBehaviour
         blocksOnTopFloor = 3;
         blockWidth = width;
         blockHeight = height;
-        UpdateGroundHeight();
-    }
-
-    private void UpdateGroundHeight()
-    {
-        if (surfacePlane != null)
-        {
-            Collider col = surfacePlane.GetComponent<Collider>();
-            baseGroundY = (col != null) ? col.bounds.max.y : surfacePlane.position.y;
-        }
     }
 
     public bool CanPlayerInteract()
     {
         if (isGameOver) return false;
         if (!isArTrackingStable) return false;
-        if (currentState != GameState.PLAYER_TURN) return false;
-        if (hasMovedBlockThisTurn) return false;
-        return true;
+        return currentState == GameState.PLAYER_TURN;
     }
 
     public bool CanTouchBlock(int blockFloor)
     {
-        if (isGameOver) return false;
-        if (currentState == GameState.STABILITY_CHECK || currentState == GameState.RELOCATING_BLOCK) return false;
+        if (!CanPlayerInteract()) return false;
         return blockFloor < currentTopFloor;
     }
 
     public void OnBlockDragStart(JengaBlock block)
     {
         if (isGameOver) return;
-        hasMovedBlockThisTurn = true;
         currentMovedBlock = block;
         block.wasTouchedByPlayer = true;
+    }
+
+    public void OnBlockDragCanceled()
+    {
+        currentMovedBlock = null;
     }
 
     public void RelocateBlockToTop(JengaBlock block)
     {
         if (isGameOver) return;
-        StartCoroutine(PlaceOnTopAndCheckStabilityRoutine(block));
+        StartCoroutine(AnimateBlockToTopRoutine(block));
     }
 
-    private IEnumerator PlaceOnTopAndCheckStabilityRoutine(JengaBlock block)
+    private IEnumerator AnimateBlockToTopRoutine(JengaBlock block)
     {
         currentState = GameState.RELOCATING_BLOCK;
 
         Rigidbody rb = block.GetComponent<Rigidbody>();
+        BoxCollider col = block.GetComponent<BoxCollider>();
+
         if (rb != null)
         {
-            if (!rb.isKinematic)
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
             rb.isKinematic = true;
+        }
+
+        yield return new WaitForSeconds(0.12f);
+
+        if (col != null)
+        {
+            col.enabled = false;
         }
 
         if (blocksOnTopFloor >= 3)
@@ -194,61 +173,87 @@ public class JengaGameManager : MonoBehaviour
             blocksOnTopFloor = 0;
         }
 
-        Vector3 origin = transform.position;
-        if (surfacePlane != null)
-        {
-            Collider col = surfacePlane.GetComponent<Collider>();
-            if (col != null)
-            {
-                Bounds b = col.bounds;
-                origin = new Vector3(b.center.x, b.max.y, b.center.z);
-            }
-            else
-            {
-                origin = surfacePlane.position;
-            }
-        }
-
-        float extraHeight = 0.0005f;
-        float targetY = origin.y + (blockHeight / 2f) + extraHeight + (currentTopFloor - 1) * blockHeight;
-
-        // Orden equilibrado de colocación en nivel superior:
-        // 1er bloque (0 presentes) -> Centro (0)
-        // 2do bloque (1 presente)  -> Izquierda (-1)
-        // 3er bloque (2 presentes) -> Derecha (+1)
-        float offsetMultiplier = 0f;
-        if (blocksOnTopFloor == 1) offsetMultiplier = -1f;
-        else if (blocksOnTopFloor == 2) offsetMultiplier = 1f;
-
-        float offset = offsetMultiplier * (blockWidth + microGap);
-
         int floorIndex = currentTopFloor - 1;
         bool isEvenFloor = (floorIndex % 2 == 0);
 
-        Vector3 targetPos = isEvenFloor
-            ? new Vector3(origin.x + offset, targetY, origin.z)
-            : new Vector3(origin.x, targetY, origin.z + offset);
+        // ORDEN CENTRADO DE MÁXIMA ESTABILIDAD:
+        // 1er bloque (0 presentes) -> Centro (0)    (el peso queda 100% sobre el eje central)
+        // 2do bloque (1 presente)  -> Izquierda (-1)
+        // 3er bloque (2 presentes) -> Derecha (+1)
+        float offsetMultiplier = 0f;
+        if (blocksOnTopFloor == 0) offsetMultiplier = 0f;
+        else if (blocksOnTopFloor == 1) offsetMultiplier = -1f;
+        else if (blocksOnTopFloor == 2) offsetMultiplier = 1f;
 
-        Quaternion targetRot = isEvenFloor
+        float offset = offsetMultiplier * (blockWidth + microGap);
+        float localY = (blockHeight / 2f) + (floorIndex * blockHeight);
+
+        Vector3 localTargetPos = isEvenFloor
+            ? new Vector3(offset, localY, 0f)
+            : new Vector3(0f, localY, offset);
+
+        Quaternion localTargetRot = isEvenFloor
             ? Quaternion.identity
             : Quaternion.Euler(0f, 90f, 0f);
 
+        Vector3 targetPos = transform.TransformPoint(localTargetPos);
+        Quaternion targetRot = transform.rotation * localTargetRot;
+
+        Vector3 startPos = block.transform.position;
+        Quaternion startRot = block.transform.rotation;
+
+        float duration = 0.75f;
+        float elapsed = 0f;
+        float peakY = Mathf.Max(startPos.y, targetPos.y) + (blockHeight * 2.0f);
+
+        while (elapsed < duration)
+        {
+            if (isGameOver)
+            {
+                if (col != null) col.enabled = true;
+                if (rb != null)
+                {
+                    rb.isKinematic = false;
+                    rb.useGravity = true;
+                }
+                yield break;
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            Vector3 currentPos = Vector3.Lerp(startPos, targetPos, smoothT);
+            float arc = 4f * (smoothT - (smoothT * smoothT));
+            currentPos.y += arc * (peakY - Mathf.Lerp(startPos.y, targetPos.y, smoothT));
+
+            block.transform.position = currentPos;
+            block.transform.rotation = Quaternion.Slerp(startRot, targetRot, smoothT);
+
+            yield return null;
+        }
+
+        block.transform.position = targetPos;
+        block.transform.rotation = targetRot;
         block.floorLevel = currentTopFloor;
         block.hasFallen = false;
-
-        block.transform.SetPositionAndRotation(targetPos, targetRot);
         blocksOnTopFloor++;
 
-        yield return new WaitForSeconds(0.1f);
+        if (col != null)
+        {
+            col.enabled = true;
+        }
+
+        yield return new WaitForFixedUpdate();
 
         if (rb != null)
         {
             rb.isKinematic = false;
             rb.useGravity = true;
-            rb.Sleep();
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
         }
 
-        // Evaluación de estabilidad durante 5 segundos
         currentState = GameState.STABILITY_CHECK;
         stabilityTimer = stabilityCheckDuration;
 
@@ -275,10 +280,8 @@ public class JengaGameManager : MonoBehaviour
             currentPlayerIndex = 1;
         }
 
-        hasMovedBlockThisTurn = false;
         currentMovedBlock = null;
         currentState = GameState.PLAYER_TURN;
-        Debug.Log($"[JengaGameManager] ¡Turno superado! Ahora es el turno del Jugador {currentPlayerIndex}.");
     }
 
     public void TriggerTowerCollapse(string cause)
@@ -289,8 +292,6 @@ public class JengaGameManager : MonoBehaviour
         losingPlayerIndex = currentPlayerIndex;
         currentState = GameState.GAME_OVER;
         StopAllCoroutines();
-
-        Debug.LogError($"💥 ¡LA TORRE HA CAÍDO! {cause}. EL JUGADOR {losingPlayerIndex} HA PERDIDO.");
     }
 
     [ContextMenu("Reiniciar Partida")]
@@ -298,58 +299,56 @@ public class JengaGameManager : MonoBehaviour
     {
         StopAllCoroutines();
 
-        currentTopFloor = 18;
-        blocksOnTopFloor = 3;
-
-        // Reiniciar el monitor de caídas
-        JengaTowerMonitor monitor = Object.FindFirstObjectByType<JengaTowerMonitor>();
-        if (monitor != null)
-        {
-            Destroy(monitor); 
-        }
-        gameObject.AddComponent<JengaTowerMonitor>();
-
         JengaFloorTest floorTest = Object.FindFirstObjectByType<JengaFloorTest>();
         if (floorTest != null)
         {
+            currentTopFloor = floorTest.floors;
+            blocksOnTopFloor = 3;
             floorTest.SpawnTower();
         }
 
         StartGame();
     }
-    // Interfaz gráfica Móvil OnGUI elegante, estilizada y moderna
+
     void OnGUI()
     {
         float sw = Screen.width;
         float sh = Screen.height;
 
-        // Estilos para Paneles y Textos
-        GUIStyle cardStyle = new GUIStyle(GUI.skin.box);
-        cardStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.022f), 16, 24);
-        cardStyle.fontStyle = FontStyle.Bold;
-        cardStyle.alignment = TextAnchor.MiddleCenter;
+        GUIStyle cardStyle = new GUIStyle(GUI.skin.box)
+        {
+            fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.022f), 16, 24),
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter
+        };
         cardStyle.normal.textColor = Color.white;
 
-        GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
-        labelStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.018f), 13, 18);
-        labelStyle.fontStyle = FontStyle.Bold;
+        GUIStyle labelStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.018f), 13, 18),
+            fontStyle = FontStyle.Bold
+        };
         labelStyle.normal.textColor = new Color(0.9f, 0.95f, 1f);
 
-        GUIStyle subLabelStyle = new GUIStyle(GUI.skin.label);
-        subLabelStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.016f), 12, 16);
-        subLabelStyle.fontStyle = FontStyle.Italic;
-        subLabelStyle.alignment = TextAnchor.MiddleCenter;
+        GUIStyle subLabelStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.016f), 12, 16),
+            fontStyle = FontStyle.Italic,
+            alignment = TextAnchor.MiddleCenter
+        };
         subLabelStyle.normal.textColor = new Color(1f, 0.9f, 0.4f);
 
-        GUIStyle btnStyle = new GUIStyle(GUI.skin.button);
-        btnStyle.fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.018f), 13, 18);
-        btnStyle.fontStyle = FontStyle.Bold;
-        btnStyle.alignment = TextAnchor.MiddleCenter;
+        GUIStyle btnStyle = new GUIStyle(GUI.skin.button)
+        {
+            fontSize = Mathf.Clamp(Mathf.RoundToInt(sh * 0.018f), 13, 18),
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter
+        };
         btnStyle.normal.textColor = Color.white;
 
-       
         float resetBtnW = Mathf.Clamp(sw * 0.3f, 110f, 160f);
         float resetBtnH = Mathf.Clamp(sh * 0.05f, 40f, 55f);
+
         GUI.color = new Color(0.15f, 0.65f, 1f);
         if (GUI.Button(new Rect(sw - resetBtnW - 20, 20, resetBtnW, resetBtnH), "🔄 REINICIAR", btnStyle))
         {
@@ -370,14 +369,12 @@ public class JengaGameManager : MonoBehaviour
         }
         GUI.color = Color.white;
 
-
         float panelW = sw - 40f;
         float panelH = Mathf.Clamp(sh * 0.28f, 190f, 260f);
         GUILayout.BeginArea(new Rect(20, resetBtnH + 30, panelW, panelH));
 
         if (!isGameOver)
         {
-            // Selector de Jugadores Elegante (2, 3 o 4)
             GUILayout.BeginHorizontal();
             GUILayout.Label("👥 Jugadores:", labelStyle, GUILayout.Width(110));
             for (int p = 2; p <= 4; p++)
@@ -397,40 +394,41 @@ public class JengaGameManager : MonoBehaviour
 
             GUILayout.Space(8);
 
-            // Card de Turno del Jugador Activo con Color Neón Distintivo
-            Color playerColor;
-            string playerEmoji;
-            switch (currentPlayerIndex)
+            Color playerColor = currentPlayerIndex switch
             {
-                case 1: playerColor = new Color(0f, 0.95f, 1f); playerEmoji = "💎"; break;
-                case 2: playerColor = new Color(1f, 0.84f, 0f); playerEmoji = "👑"; break;
-                case 3: playerColor = new Color(1f, 0.2f, 0.6f); playerEmoji = "⚡"; break;
-                case 4: playerColor = new Color(0f, 0.9f, 0.45f); playerEmoji = "🔥"; break;
-                default: playerColor = Color.cyan; playerEmoji = "👤"; break;
-            }
+                1 => new Color(0f, 0.95f, 1f),
+                2 => new Color(1f, 0.84f, 0f),
+                3 => new Color(1f, 0.2f, 0.6f),
+                4 => new Color(0f, 0.9f, 0.45f),
+                _ => Color.cyan
+            };
 
             GUI.color = playerColor;
-            GUILayout.Box($"{playerEmoji} TURNO ACTUAL: JUGADOR {currentPlayerIndex}", cardStyle, GUILayout.Height(45));
+            GUILayout.Box($"TURNO ACTUAL: JUGADOR {currentPlayerIndex}", cardStyle, GUILayout.Height(45));
             GUI.color = Color.white;
 
             GUILayout.Space(5);
 
-            // Estado de Estabilidad / Instrucción de Turno
-            if (currentState == GameState.STABILITY_CHECK)
+            if (currentState == GameState.RELOCATING_BLOCK)
+            {
+                GUI.color = new Color(0.4f, 0.9f, 1f);
+                GUILayout.Box("📦 COLOCANDO PIEZA EN LA CIMA...", cardStyle, GUILayout.Height(40));
+                GUI.color = Color.white;
+            }
+            else if (currentState == GameState.STABILITY_CHECK)
             {
                 GUI.color = new Color(1f, 0.85f, 0.2f);
                 GUILayout.Box($"⏱️ EVALUANDO ESTABILIDAD: {stabilityTimer:F1}s", cardStyle, GUILayout.Height(40));
                 GUI.color = Color.white;
-                GUILayout.Label("¡No toques! Evaluando si la torre se sostiene...", subLabelStyle);
+                GUILayout.Label("⏳ Espera: validando si la torre se sostiene...", subLabelStyle);
             }
             else if (currentState == GameState.PLAYER_TURN)
             {
-                GUILayout.Label("👇 Toca un bloque para extraerlo (prohibido del nivel superior).", subLabelStyle);
+                GUILayout.Label("👇 Arrastra un bloque hasta extraerlo completamente fuera.", subLabelStyle);
             }
         }
         else
         {
-            // Pantalla / Modal de Game Over
             GUI.color = new Color(1f, 0.25f, 0.25f);
             GUILayout.Box($"💥 ¡LA TORRE HA CAÍDO!\n❌ EL JUGADOR {losingPlayerIndex} HA PERDIDO LA PARTIDA", cardStyle, GUILayout.Height(85));
             GUI.color = Color.white;

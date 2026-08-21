@@ -2,7 +2,8 @@ using UnityEngine;
 
 public class BlockLogic : MonoBehaviour
 {
-    [SerializeField] private float movementScale = 0.0005f;
+    [Header("Sensibilidad")]
+    [SerializeField] private float movementSensitivity = 0.0012f;
 
     private Camera arCamera;
     private bool isDragging = false;
@@ -10,9 +11,13 @@ public class BlockLogic : MonoBehaviour
     private Transform draggedBlock;
     private Rigidbody draggedRb;
     private JengaBlock draggedJengaBlock;
+    private BoxCollider draggedCollider;
 
     private Vector2 initialTouchPosition;
     private Vector3 initialBlockPosition;
+    private Vector3 targetPhysicsPosition;
+
+    private const float FULL_EXTRACTION_DISTANCE = 0.080f;
 
     void Start()
     {
@@ -32,14 +37,11 @@ public class BlockLogic : MonoBehaviour
                     break;
                 case TouchPhase.Moved:
                 case TouchPhase.Stationary:
-                    if (isDragging)
-                    {
-                        DragBlock(touch.position);
-                    }
+                    if (isDragging) UpdateDragTarget(touch.position);
                     break;
                 case TouchPhase.Ended:
                 case TouchPhase.Canceled:
-                    StopDragging();
+                    if (isDragging) StopDragging();
                     break;
             }
         }
@@ -49,7 +51,7 @@ public class BlockLogic : MonoBehaviour
         }
         else if (Input.GetMouseButton(0) && isDragging)
         {
-            DragBlock(Input.mousePosition);
+            UpdateDragTarget(Input.mousePosition);
         }
         else if (Input.GetMouseButtonUp(0) && isDragging)
         {
@@ -57,56 +59,43 @@ public class BlockLogic : MonoBehaviour
         }
     }
 
-    private PhysicsMaterial zeroFrictionMaterial;
-    private PhysicsMaterial originalMaterial;
-
-    private PhysicsMaterial GetZeroFrictionMaterial()
+    void FixedUpdate()
     {
-        if (zeroFrictionMaterial == null)
+        if (isDragging && draggedRb != null)
         {
-            zeroFrictionMaterial = new PhysicsMaterial("ZeroFrictionMaterial")
-            {
-                dynamicFriction = 0f,
-                staticFriction = 0f,
-                bounciness = 0f,
-                frictionCombine = PhysicsMaterialCombine.Minimum,
-                bounceCombine = PhysicsMaterialCombine.Minimum
-            };
+            draggedRb.MovePosition(targetPhysicsPosition);
         }
-        return zeroFrictionMaterial;
     }
 
-    void StartDragging(Vector2 touchPosition)
+    void StartDragging(Vector2 screenPosition)
     {
-        if (arCamera == null)
-        {
-            arCamera = Camera.main;
-            if (arCamera == null) return;
-        }
+        if (arCamera == null) arCamera = Camera.main;
+        if (arCamera == null) return;
 
-        Ray ray = arCamera.ScreenPointToRay(touchPosition);
-        if (!Physics.Raycast(ray, out RaycastHit hit))
+        if (JengaGameManager.Instance != null && !JengaGameManager.Instance.CanPlayerInteract())
             return;
+
+        Ray ray = arCamera.ScreenPointToRay(screenPosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit)) return;
 
         JengaBlock block = hit.collider.GetComponentInParent<JengaBlock>();
-        if (block == null)
-            return;
+        if (block == null) return;
 
-        if (JengaGameManager.Instance != null &&
-            !JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
-        {
+        if (JengaGameManager.Instance != null && !JengaGameManager.Instance.CanTouchBlock(block.floorLevel))
             return;
-        }
 
         draggedBlock = block.transform;
         draggedJengaBlock = block;
         draggedRb = block.GetComponent<Rigidbody>();
+        draggedCollider = block.GetComponent<BoxCollider>();
 
-        BoxCollider box = block.GetComponent<BoxCollider>();
-        if (box != null)
+        if (JengaGameManager.Instance != null)
+            JengaGameManager.Instance.OnBlockDragStart(block);
+
+        // Al extraerlo, desactivamos su colisión sólida para que no levante ni empuje los pisos vecinos
+        if (draggedCollider != null)
         {
-            originalMaterial = box.sharedMaterial;
-            box.sharedMaterial = GetZeroFrictionMaterial();
+            draggedCollider.isTrigger = true;
         }
 
         if (draggedRb != null)
@@ -116,30 +105,13 @@ public class BlockLogic : MonoBehaviour
             draggedRb.isKinematic = true;
         }
 
-        // Congelar movimientos innecesarios del resto de la torre para mantenerla firme al sacar la pieza
-        JengaBlock[] allBlocks = Object.FindObjectsByType<JengaBlock>(FindObjectsSortMode.None);
-        foreach (JengaBlock b in allBlocks)
-        {
-            if (b != null && b.transform != draggedBlock)
-            {
-                Rigidbody r = b.GetComponent<Rigidbody>();
-                if (r != null && !r.isKinematic)
-                {
-                    r.constraints = RigidbodyConstraints.FreezePositionX |
-                                    RigidbodyConstraints.FreezePositionZ |
-                                    RigidbodyConstraints.FreezeRotationX |
-                                    RigidbodyConstraints.FreezeRotationZ;
-                }
-            }
-        }
-
-        isDragging = false;
-        initialTouchPosition = touchPosition;
+        initialTouchPosition = screenPosition;
         initialBlockPosition = draggedBlock.position;
+        targetPhysicsPosition = initialBlockPosition;
         isDragging = true;
     }
 
-    void DragBlock(Vector2 currentTouchPosition)
+    void UpdateDragTarget(Vector2 currentScreenPosition)
     {
         if (draggedBlock == null)
         {
@@ -147,84 +119,87 @@ public class BlockLogic : MonoBehaviour
             return;
         }
 
-        Vector2 touchDelta = currentTouchPosition - initialTouchPosition;
-        float horizontalMovement = touchDelta.x * movementScale;
-        float forwardMovement = touchDelta.y * movementScale;
+        Vector2 delta = currentScreenPosition - initialTouchPosition;
 
-        Vector3 cameraRight = arCamera.transform.right;
-        Vector3 cameraForward = arCamera.transform.forward;
-        cameraForward.y = 0;
-        cameraForward.Normalize();
-        cameraRight.y = 0;
-        cameraRight.Normalize();
+        Vector3 camRight = arCamera.transform.right;
+        Vector3 camForward = arCamera.transform.forward;
+        camForward.y = 0; camForward.Normalize();
+        camRight.y = 0; camRight.Normalize();
 
-        Vector3 rawMovement =
-            cameraRight * horizontalMovement +
-            cameraForward * forwardMovement;
-        rawMovement.y = 0;
+        Vector3 moveWorld = (camRight * delta.x + camForward * delta.y) * movementSensitivity;
 
         Vector3 slideAxis = draggedBlock.forward;
-        float slideAmount = Vector3.Dot(rawMovement, slideAxis);
-        Vector3 constrainedMovement = slideAxis * slideAmount;
+        float slideAmount = Vector3.Dot(moveWorld, slideAxis);
+        targetPhysicsPosition = initialBlockPosition + (slideAxis * slideAmount);
 
-        Vector3 targetPos = initialBlockPosition + constrainedMovement;
-
-        if (draggedRb != null)
+        if (Mathf.Abs(slideAmount) >= FULL_EXTRACTION_DISTANCE)
         {
-            draggedRb.MovePosition(targetPos);
+            CompleteExtraction();
         }
-        else
+    }
+
+    void CompleteExtraction()
+    {
+        isDragging = false;
+
+        if (draggedCollider != null)
         {
-            draggedBlock.position = targetPos;
+            draggedCollider.isTrigger = false;
+        }
+
+        JengaBlock extracted = draggedJengaBlock;
+        ResetDragState();
+
+        if (JengaGameManager.Instance != null && extracted != null)
+        {
+            JengaGameManager.Instance.RelocateBlockToTop(extracted);
         }
     }
 
     void StopDragging()
     {
-        if (draggedBlock != null)
+        if (!isDragging || draggedBlock == null)
         {
-            BoxCollider box = draggedBlock.GetComponent<BoxCollider>();
-            if (box != null && originalMaterial != null)
+            ResetDragState();
+            return;
+        }
+
+        if (draggedCollider != null)
+        {
+            draggedCollider.isTrigger = false;
+        }
+
+        float extractedDist = Vector3.Distance(targetPhysicsPosition, initialBlockPosition);
+
+        if (extractedDist >= FULL_EXTRACTION_DISTANCE)
+        {
+            CompleteExtraction();
+        }
+        else
+        {
+            if (draggedRb != null)
             {
-                box.sharedMaterial = originalMaterial;
+                draggedRb.isKinematic = false;
+                draggedRb.useGravity = true;
+                draggedRb.linearVelocity = Vector3.zero;
+                draggedRb.angularVelocity = Vector3.zero;
             }
-        }
 
-        if (draggedRb != null)
-        {
-            draggedRb.linearVelocity = Vector3.zero;
-            draggedRb.angularVelocity = Vector3.zero;
-            draggedRb.isKinematic = false;
-            draggedRb.useGravity = true;
-            // Forzamos un modo de colisión estable para evitar traspasos bruscos al soltar
-            draggedRb.collisionDetectionMode = CollisionDetectionMode.Discrete;
-        }
-
-        if (draggedJengaBlock != null)
-        {
-            draggedJengaBlock.wasTouchedByPlayer = true;
-        }
-
-        // Restablecer restricciones de forma controlada en la torre sin golpear la estructura
-        JengaBlock[] allBlocks = Object.FindObjectsByType<JengaBlock>(FindObjectsSortMode.None);
-        foreach (JengaBlock b in allBlocks)
-        {
-            if (b != null)
+            if (JengaGameManager.Instance != null)
             {
-                Rigidbody r = b.GetComponent<Rigidbody>();
-                if (r != null)
-                {
-                    // Liberamos rotaciones pero mantenemos una pequeña restricción de posición horizontal extra 
-                    // un instante para que el motor asiente los bloques de forma orgánica
-                    r.constraints = RigidbodyConstraints.None;
-                }
+                JengaGameManager.Instance.OnBlockDragCanceled();
             }
-        }
 
+            ResetDragState();
+        }
+    }
+
+    private void ResetDragState()
+    {
         isDragging = false;
         draggedBlock = null;
         draggedRb = null;
         draggedJengaBlock = null;
-        originalMaterial = null;
+        draggedCollider = null;
     }
 }

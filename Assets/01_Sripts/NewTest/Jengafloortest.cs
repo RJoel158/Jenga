@@ -10,11 +10,9 @@ public class JengaFloorTest : MonoBehaviour
     public float blockHeight = 0.015f;
     public float blockLength = 0.075f;
 
-    public int floors = 18;
+    public int floors = 10;
     public Transform surfacePlane;
-
-    public float microGap = 0.00015f;
-    public float delayAfterTracked = 0.3f;
+    public float microGap = 0.00035f;
 
     private ObserverBehaviour observerBehaviour;
     private bool spawned = false;
@@ -22,21 +20,22 @@ public class JengaFloorTest : MonoBehaviour
 
     void Awake()
     {
-        Physics.defaultContactOffset = 0.0002f;
-        Physics.defaultSolverIterations = 40;
-        Physics.defaultSolverVelocityIterations = 15;
-        Physics.sleepThreshold = 0.0001f;
-        Physics.defaultMaxDepenetrationVelocity = 0.5f;
+        Physics.defaultContactOffset = 0.0001f;
+        Physics.defaultSolverIterations = 60;
+        Physics.defaultSolverVelocityIterations = 30;
+        Physics.defaultMaxDepenetrationVelocity = 0.15f;
+        Physics.sleepThreshold = 0.001f;
+        Physics.bounceThreshold = 2.0f;
     }
 
     private PhysicsMaterial GetWoodMaterial()
     {
         if (jengaWoodMaterial == null)
         {
-            jengaWoodMaterial = new PhysicsMaterial("JengaWoodMaterial")
+            jengaWoodMaterial = new PhysicsMaterial("JengaPolishedWood")
             {
-                dynamicFriction = 0.25f,
-                staticFriction = 0.40f,
+                dynamicFriction = 0.45f,
+                staticFriction = 0.58f,
                 bounciness = 0.0f,
                 frictionCombine = PhysicsMaterialCombine.Average,
                 bounceCombine = PhysicsMaterialCombine.Minimum
@@ -93,7 +92,7 @@ public class JengaFloorTest : MonoBehaviour
         }
     }
 
-    [ContextMenu("Spawnear Torre Jenga Limpia")]
+    [ContextMenu("Spawnear Torre Jenga")]
     public void SpawnTower()
     {
         StopAllCoroutines();
@@ -104,9 +103,6 @@ public class JengaFloorTest : MonoBehaviour
     {
         if (blockPrefab == null || surfacePlane == null) yield break;
 
-        Collider floorCollider = surfacePlane.GetComponent<Collider>();
-        if (floorCollider == null) yield break;
-
         AutoDetectDimensions();
         CleanupDuplicateAndStaticObjects();
 
@@ -115,35 +111,41 @@ public class JengaFloorTest : MonoBehaviour
             DestroyImmediate(transform.GetChild(i).gameObject);
         }
 
-        Bounds b = floorCollider.bounds;
-        Vector3 origin = new Vector3(b.center.x, b.max.y, b.center.z);
-
         ConfigureGameManager(surfacePlane);
         EnsureInputController();
 
         PhysicsMaterial woodMat = GetWoodMaterial();
 
+        Collider tableCol = surfacePlane.GetComponent<Collider>();
+        if (tableCol != null)
+        {
+            tableCol.sharedMaterial = woodMat;
+        }
+
         for (int floor = 0; floor < floors; floor++)
         {
             bool isEvenFloor = (floor % 2 == 0);
-            float targetY = origin.y + (blockHeight / 2f) + (floor * blockHeight);
+            float localY = (blockHeight / 2f) + (floor * blockHeight);
 
             GameObject floorParent = new GameObject($"Floor_{floor + 1}");
-            floorParent.transform.SetParent(transform, true);
+            floorParent.transform.SetParent(transform, false);
 
             for (int i = 0; i < 3; i++)
             {
                 float offset = (i - 1) * (blockWidth + microGap);
 
-                Vector3 spawnPos = isEvenFloor
-                    ? new Vector3(origin.x + offset, targetY, origin.z)
-                    : new Vector3(origin.x, targetY, origin.z + offset);
+                Vector3 localPos = isEvenFloor
+                    ? new Vector3(offset, localY, 0f)
+                    : new Vector3(0f, localY, offset);
 
-                Quaternion rotation = isEvenFloor
+                Quaternion localRot = isEvenFloor
                     ? Quaternion.identity
                     : Quaternion.Euler(0f, 90f, 0f);
 
-                GameObject block = Instantiate(blockPrefab, spawnPos, rotation, floorParent.transform);
+                Vector3 worldPos = transform.TransformPoint(localPos);
+                Quaternion worldRot = transform.rotation * localRot;
+
+                GameObject block = Instantiate(blockPrefab, worldPos, worldRot, floorParent.transform);
                 block.name = $"Block_{floor + 1}_{i + 1}";
                 block.transform.localScale = new Vector3(blockWidth, blockHeight, blockLength);
 
@@ -156,13 +158,11 @@ public class JengaFloorTest : MonoBehaviour
                 Rigidbody rb = block.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
-                    rb.mass = 1.5f;
-                    rb.linearDamping = 2f;
-                    rb.angularDamping = 3f;
-                    rb.linearVelocity = Vector3.zero;
-                    rb.angularVelocity = Vector3.zero;
+                    rb.mass = 0.15f;             // 150 gramos: masa sólida y estable
+                    rb.linearDamping = 0.5f;
+                    rb.angularDamping = 4.0f;    // Evita balanceos excesivos
                     rb.interpolation = RigidbodyInterpolation.Interpolate;
-                    rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+                    rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                     rb.isKinematic = true;
                     rb.useGravity = false;
                 }
@@ -178,7 +178,7 @@ public class JengaFloorTest : MonoBehaviour
             }
         }
 
-        yield return null;
+        yield return new WaitForSeconds(0.1f);
 
         for (int f = 0; f < transform.childCount; f++)
         {
@@ -194,8 +194,6 @@ public class JengaFloorTest : MonoBehaviour
                 }
             }
         }
-
-        Debug.Log($"[JengaFloorTest] Torre Jenga de {floors} pisos construida perfectamente sin penetración de suelo.");
     }
 
     private static void ApplyWoodColorVariation(GameObject block, int floor, int index)
@@ -208,8 +206,8 @@ public class JengaFloorTest : MonoBehaviour
         Random.InitState(seed);
 
         float baseHue = Random.Range(0.07f, 0.11f);
-        float baseSat = Random.Range(0.22f, 0.45f);
-        float baseVal = Random.Range(0.72f, 0.95f);
+        float baseSat = Random.Range(0.22f, 0.40f);
+        float baseVal = Random.Range(0.75f, 0.95f);
 
         Color woodColor = Color.HSVToRGB(baseHue, baseSat, baseVal);
         Random.state = previousState;
@@ -219,14 +217,6 @@ public class JengaFloorTest : MonoBehaviour
         propBlock.SetColor("_Color", woodColor);
         propBlock.SetColor("_BaseColor", woodColor);
         renderer.SetPropertyBlock(propBlock);
-
-        if (renderer.material != null)
-        {
-            if (renderer.material.HasProperty("_Color"))
-                renderer.material.color = woodColor;
-            else if (renderer.material.HasProperty("_BaseColor"))
-                renderer.material.SetColor("_BaseColor", woodColor);
-        }
     }
 
     private void CleanupDuplicateAndStaticObjects()
@@ -238,10 +228,7 @@ public class JengaFloorTest : MonoBehaviour
         transform.localRotation = Quaternion.identity;
 
         Transform staticBlock = parentTarget.Find("JengaBlock");
-        if (staticBlock != null)
-        {
-            Destroy(staticBlock.gameObject);
-        }
+        if (staticBlock != null) Destroy(staticBlock.gameObject);
 
         for (int i = parentTarget.childCount - 1; i >= 0; i--)
         {
@@ -262,7 +249,6 @@ public class JengaFloorTest : MonoBehaviour
         {
             manager = gameObject.AddComponent<JengaGameManager>();
         }
-
         manager.Configure(ground, floors, blockWidth, blockHeight);
     }
 
